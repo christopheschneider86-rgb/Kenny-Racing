@@ -28,24 +28,35 @@ jobs:
         with:
           lfs: true
 
+      - name: Set Permissions & Safe Directory
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          chmod -R ugo+rwX "$GITHUB_WORKSPACE"
+
       - name: Setup Export Templates
         run: |
-          mkdir -v -p ~/.local/share/godot/export_templates/4.3.stable
-          if [ ! -f ~/.local/share/godot/export_templates/4.3.stable/web_release.zip ] && [ ! -f ~/.local/share/godot/export_templates/4.3.stable/web_nothreads_release.zip ]; then
+          mkdir -v -p ~/.local/share/godot/export_templates/
+          mkdir -v -p ~/.config/
+          cp -r /root/.config/godot ~/.config/ 2>/dev/null || true
+          cp -r /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/ 2>/dev/null || true
+          if [ ! -d ~/.local/share/godot/export_templates/4.3.stable ]; then
             echo "Downloading Godot 4.3 export templates..."
             GODOT_VERSION=4.3-stable
             wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz
             unzip -q Godot_v${GODOT_VERSION}_export_templates.tpz
+            mkdir -p ~/.local/share/godot/export_templates/4.3.stable
             mv templates/* ~/.local/share/godot/export_templates/4.3.stable/
             rm -f Godot_v${GODOT_VERSION}_export_templates.tpz
-          else
-            echo "Export templates already present in image."
           fi
+
+      - name: Import Assets
+        run: |
+          godot --headless --editor --quit || true
 
       - name: Web Export
         run: |
           mkdir -v -p build/web
-          godot --headless --verbose --export-release "Web" build/web/index.html
+          godot --headless --export-release "Web" build/web/index.html
 
       - name: Upload GitHub Pages Artifact
         uses: actions/upload-pages-artifact@v3
