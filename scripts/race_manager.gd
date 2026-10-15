@@ -16,9 +16,9 @@ signal race_reward_completed(data: Dictionary)
 
 enum GameState { MENU = 0, COUNTDOWN = 1, RACING = 2, FINISHED = 3 }
 
-@export var vehicle: Vehicle
+@export var vehicle: Node3D
 @export var grid_map: GridMap
-@export var sound_effects: SoundEffects
+@export var sound_effects: Node
 @export var total_laps: int = 4
 
 var current_state: GameState = GameState.MENU

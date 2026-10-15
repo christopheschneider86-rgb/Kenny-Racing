@@ -25,23 +25,23 @@ func _ready() -> void:
 	_generate_all_sounds()
 
 func _generate_all_sounds() -> void:
-	_snd_click = _create_sine_pcm([(880.0, 0.05, 0.4)])
-	_snd_beep_low = _create_sine_pcm([(523.25, 0.15, 0.5)])
-	_snd_beep_high = _create_sine_pcm([(1046.5, 0.3, 0.6)])
+	_snd_click = _create_sine_pcm([[880.0, 0.05, 0.4]])
+	_snd_beep_low = _create_sine_pcm([[523.25, 0.15, 0.5]])
+	_snd_beep_high = _create_sine_pcm([[1046.5, 0.3, 0.6]])
 	_snd_lap = _create_sine_pcm([
-		(523.25, 0.1, 0.5), # C5
-		(659.25, 0.1, 0.55), # E5
-		(783.99, 0.25, 0.6)  # G5
+		[523.25, 0.1, 0.5], # C5
+		[659.25, 0.1, 0.55], # E5
+		[783.99, 0.25, 0.6]  # G5
 	])
 	_snd_wrong_way = _create_sine_pcm([
-		(392.0, 0.12, 0.5), # G4
-		(329.63, 0.2, 0.55)  # E4
+		[392.0, 0.12, 0.5], # G4
+		[329.63, 0.2, 0.55]  # E4
 	])
 	_snd_victory = _create_sine_pcm([
-		(523.25, 0.12, 0.5), # C5
-		(659.25, 0.12, 0.5), # E5
-		(783.99, 0.15, 0.55), # G5
-		(1046.5, 0.4, 0.65)  # C6
+		[523.25, 0.12, 0.5], # C5
+		[659.25, 0.12, 0.5], # E5
+		[783.99, 0.15, 0.55], # G5
+		[1046.5, 0.4, 0.65]  # C6
 	])
 
 func _create_sine_pcm(notes: Array) -> AudioStreamWAV:

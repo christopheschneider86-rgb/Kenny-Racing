@@ -12,10 +12,10 @@ class_name UIOverlay extends CanvasLayer
 # - Countdown and Lap Announcements
 # - Victory Screen with Stars, Time, and Replay Buttons
 
-@export var race_manager: RaceManager
-@export var vehicle: Vehicle
-@export var sound_effects: SoundEffects
-@export var track_manager: TrackManager
+@export var race_manager: Node
+@export var vehicle: Node3D
+@export var sound_effects: Node
+@export var track_manager: Node
 
 # Root Controls
 var root_control: Control

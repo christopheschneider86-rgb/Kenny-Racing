@@ -1,14 +1,14 @@
 extends Vehicle
 
-@onready var motorcycle = $"Container/Model/motorcycle"
-@onready var fork = $"Container/Model/motorcycle/body/fork"
-
-@onready var wheel_front = $"Container/Model/motorcycle/wheel-front"
-@onready var wheel_back = $"Container/Model/motorcycle/wheel-back"
+var motorcycle: Node3D
 
 func _ready():
-	
-	vehicle_body = $Container/Model/motorcycle/body
+	super._ready()
+	motorcycle = get_node_or_null("Container/Model/motorcycle")
+	fork = get_node_or_null("Container/Model/motorcycle/body/fork")
+	wheel_front = get_node_or_null("Container/Model/motorcycle/wheel-front")
+	wheel_back = get_node_or_null("Container/Model/motorcycle/wheel-back")
+	vehicle_body = get_node_or_null("Container/Model/motorcycle/body")
 
 # Overwrite functions from base vehicle script
 
