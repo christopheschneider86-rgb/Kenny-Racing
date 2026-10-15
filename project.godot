@@ -17,7 +17,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 config/name="Starter Kit Racing"
 config/tags=PackedStringArray("starterkit")
 run/main_scene="res://scenes/main.tscn"
-config/features=PackedStringArray("4.6", "Forward Plus")
+config/features=PackedStringArray("4.3", "GL Compatibility")
 boot_splash/bg_color=Color(0.921875, 0.921875, 0.957031, 1)
 boot_splash/image="res://splash-screen.png"
 config/icon="res://icon.png"
@@ -85,11 +85,11 @@ pointing/emulate_touch_from_mouse=true
 
 [physics]
 
-3d/physics_engine="Jolt Physics"
-3d/physics_engine.web="default"
+3d/physics_engine="default"
 
 [rendering]
 
+renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.web="gl_compatibility"
 lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
 environment/ssao/quality=3
