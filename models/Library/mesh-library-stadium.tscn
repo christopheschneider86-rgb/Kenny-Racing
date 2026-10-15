@@ -1,0 +1,42 @@
+[gd_scene format=3]
+[ext_resource type="PackedScene" path="res://models/track-straight.glb" id="1_track-straight"]
+[ext_resource type="PackedScene" path="res://models/track-corner.glb" id="2_track-corner"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/roadStartPositions.glb" id="3_roadStartPositions"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/roadPitStraight.glb" id="4_roadPitStraight"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/roadStraightBridge.glb" id="5_roadStraightBridge"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/overheadRoundColored.glb" id="6_overheadRoundColored"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/grandStandCovered.glb" id="7_grandStandCovered"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/grandStandRound.glb" id="8_grandStandRound"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/pitsGarage.glb" id="9_pitsGarage"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/pitsOffice.glb" id="10_pitsOffice"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/lightPostLarge.glb" id="11_lightPostLarge"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/billboard.glb" id="12_billboard"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/flagCheckers.glb" id="13_flagCheckers"]
+
+[node name="MeshLibrary" type="Node3D"]
+
+[node name="track-straight" parent="." instance=ExtResource("1_track-straight")]
+
+[node name="track-corner" parent="." instance=ExtResource("2_track-corner")]
+
+[node name="roadStartPositions" parent="." instance=ExtResource("3_roadStartPositions")]
+
+[node name="roadPitStraight" parent="." instance=ExtResource("4_roadPitStraight")]
+
+[node name="roadStraightBridge" parent="." instance=ExtResource("5_roadStraightBridge")]
+
+[node name="overheadRoundColored" parent="." instance=ExtResource("6_overheadRoundColored")]
+
+[node name="grandStandCovered" parent="." instance=ExtResource("7_grandStandCovered")]
+
+[node name="grandStandRound" parent="." instance=ExtResource("8_grandStandRound")]
+
+[node name="pitsGarage" parent="." instance=ExtResource("9_pitsGarage")]
+
+[node name="pitsOffice" parent="." instance=ExtResource("10_pitsOffice")]
+
+[node name="lightPostLarge" parent="." instance=ExtResource("11_lightPostLarge")]
+
+[node name="billboard" parent="." instance=ExtResource("12_billboard")]
+
+[node name="flagCheckers" parent="." instance=ExtResource("13_flagCheckers")]

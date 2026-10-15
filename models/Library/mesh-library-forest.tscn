@@ -1,0 +1,33 @@
+[gd_scene format=3]
+[ext_resource type="PackedScene" path="res://models/track-straight.glb" id="1_track-straight"]
+[ext_resource type="PackedScene" path="res://models/track-corner.glb" id="2_track-corner"]
+[ext_resource type="PackedScene" path="res://models/track-finish.glb" id="3_track-finish"]
+[ext_resource type="PackedScene" path="res://models/track-bump.glb" id="4_track-bump"]
+[ext_resource type="PackedScene" path="res://models/decoration-forest.glb" id="5_decoration-forest"]
+[ext_resource type="PackedScene" path="res://models/decoration-tents.glb" id="6_decoration-tents"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/treeLarge.glb" id="7_treeLarge"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/treeSmall.glb" id="8_treeSmall"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/tent.glb" id="9_tent"]
+[ext_resource type="PackedScene" path="res://kenney_racing-kit/Models/GLTF format/tentLong.glb" id="10_tentLong"]
+
+[node name="MeshLibrary" type="Node3D"]
+
+[node name="track-straight" parent="." instance=ExtResource("1_track-straight")]
+
+[node name="track-corner" parent="." instance=ExtResource("2_track-corner")]
+
+[node name="track-finish" parent="." instance=ExtResource("3_track-finish")]
+
+[node name="track-bump" parent="." instance=ExtResource("4_track-bump")]
+
+[node name="decoration-forest" parent="." instance=ExtResource("5_decoration-forest")]
+
+[node name="decoration-tents" parent="." instance=ExtResource("6_decoration-tents")]
+
+[node name="treeLarge" parent="." instance=ExtResource("7_treeLarge")]
+
+[node name="treeSmall" parent="." instance=ExtResource("8_treeSmall")]
+
+[node name="tent" parent="." instance=ExtResource("9_tent")]
+
+[node name="tentLong" parent="." instance=ExtResource("10_tentLong")]
