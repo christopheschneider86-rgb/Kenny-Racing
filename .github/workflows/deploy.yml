@@ -35,19 +35,20 @@ jobs:
 
       - name: Setup Export Templates
         run: |
-          mkdir -v -p ~/.local/share/godot/export_templates/
+          mkdir -v -p ~/.local/share/godot/export_templates/4.3.stable
           mkdir -v -p ~/.config/
           cp -r /root/.config/godot ~/.config/ 2>/dev/null || true
           cp -r /root/.local/share/godot/export_templates/* ~/.local/share/godot/export_templates/ 2>/dev/null || true
-          if [ ! -d ~/.local/share/godot/export_templates/4.3.stable ]; then
-            echo "Downloading Godot 4.3 export templates..."
+          if [ ! -f ~/.local/share/godot/export_templates/4.3.stable/web_release.zip ] || [ ! -f ~/.local/share/godot/export_templates/4.3.stable/web_nothreads_release.zip ]; then
+            echo "Web export templates missing or incomplete! Downloading official templates..."
             GODOT_VERSION=4.3-stable
             wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz
-            unzip -q Godot_v${GODOT_VERSION}_export_templates.tpz
-            mkdir -p ~/.local/share/godot/export_templates/4.3.stable
+            unzip -q -o Godot_v${GODOT_VERSION}_export_templates.tpz
             mv templates/* ~/.local/share/godot/export_templates/4.3.stable/
             rm -f Godot_v${GODOT_VERSION}_export_templates.tpz
           fi
+          echo "Templates in 4.3.stable:"
+          ls -la ~/.local/share/godot/export_templates/4.3.stable/web* || true
 
       - name: Import Assets
         run: |
@@ -56,7 +57,7 @@ jobs:
       - name: Web Export
         run: |
           mkdir -v -p build/web
-          godot --headless --export-release "Web" build/web/index.html
+          godot --headless --verbose --export-release "Web" build/web/index.html
 
       - name: Upload GitHub Pages Artifact
         uses: actions/upload-pages-artifact@v3
