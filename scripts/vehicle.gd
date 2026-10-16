@@ -28,8 +28,11 @@ var motorcycle_mesh: Node3D
 
 @onready var trail_left = get_node_or_null("Container/TrailLeft")
 @onready var trail_right = get_node_or_null("Container/TrailRight")
-@onready var skid_left = get_node_or_null("Container/SkidLeft")
-@onready var skid_right = get_node_or_null("Container/SkidRight")
+
+# Continuous ribbon skidmarks
+var skid_ribbon_left: SkidRibbon
+var skid_ribbon_right: SkidRibbon
+var skid_ribbon_center: SkidRibbon
 
 var vehicle_body_default_pos: Vector3 = Vector3(0, 0.4, 0)
 
@@ -108,6 +111,21 @@ func _ready() -> void:
 	_init_wheel_references()
 	if sphere:
 		sphere.mass = get_spec()["mass"]
+
+	skid_ribbon_left = SkidRibbon.new()
+	skid_ribbon_left.name = "SkidRibbonLeft"
+	skid_ribbon_left.half_width = 0.12
+	add_child(skid_ribbon_left)
+
+	skid_ribbon_right = SkidRibbon.new()
+	skid_ribbon_right.name = "SkidRibbonRight"
+	skid_ribbon_right.half_width = 0.12
+	add_child(skid_ribbon_right)
+
+	skid_ribbon_center = SkidRibbon.new()
+	skid_ribbon_center.name = "SkidRibbonCenter"
+	skid_ribbon_center.half_width = 0.16
+	add_child(skid_ribbon_center)
 
 func _init_wheel_references() -> void:
 	vehicle_body = find_child("body", true, false)
@@ -395,10 +413,10 @@ func effect_body(delta):
 		vehicle_body.rotation.z = calculated_lean
 		vehicle_body.position = vehicle_body.position.lerp(vehicle_body_default_pos, delta * 5)
 
-	# Motorcycle corner leaning (dynamic deep lean into turns)
+	# Motorcycle corner leaning (leans dynamically inward into curves)
 	if motorcycle_mesh != null:
-		var target_lean = -input.x * clampf(abs(linear_speed), 0.25, 1.0) * 0.55
-		motorcycle_mesh.rotation.z = lerp_angle(motorcycle_mesh.rotation.z, target_lean, delta * 6.0)
+		var target_lean = input.x * clampf(abs(linear_speed), 0.2, 1.0) * 0.65
+		motorcycle_mesh.rotation.z = lerp_angle(motorcycle_mesh.rotation.z, target_lean, delta * 7.0)
 
 func effect_wheels(delta):
 	# Rotate 4 wheels (Truck & RaceCar)
@@ -444,10 +462,29 @@ func effect_trails():
 	var is_drifting = (abs(input.x) > 0.25 and abs(linear_speed) > 0.2) or (drift_intensity > 0.18)
 	var should_emit = (is_burnout or is_braking or is_drifting) and colliding
 
+	# Smoke particles
 	if trail_left != null: trail_left.emitting = should_emit
 	if trail_right != null: trail_right.emitting = should_emit
-	if skid_left != null: skid_left.emitting = should_emit
-	if skid_right != null: skid_right.emitting = should_emit
+
+	# Continuous connected ribbon skidmarks (no gaps!)
+	if should_emit:
+		if current_vehicle_type == "motorcycle":
+			# Motorcycle: exactly ONE single rear wheel track!
+			var center_pos = vehicle_model.to_global(Vector3(0.0, 0.0, -0.65))
+			if skid_ribbon_center: skid_ribbon_center.set_skidding(true, center_pos)
+			if skid_ribbon_left: skid_ribbon_left.set_skidding(false, Vector3.ZERO)
+			if skid_ribbon_right: skid_ribbon_right.set_skidding(false, Vector3.ZERO)
+		else:
+			# 4-wheel vehicles: two parallel continuous tracks
+			var left_pos = vehicle_model.to_global(Vector3(0.38, 0.0, -0.55))
+			var right_pos = vehicle_model.to_global(Vector3(-0.38, 0.0, -0.55))
+			if skid_ribbon_left: skid_ribbon_left.set_skidding(true, left_pos)
+			if skid_ribbon_right: skid_ribbon_right.set_skidding(true, right_pos)
+			if skid_ribbon_center: skid_ribbon_center.set_skidding(false, Vector3.ZERO)
+	else:
+		if skid_ribbon_left: skid_ribbon_left.set_skidding(false, Vector3.ZERO)
+		if skid_ribbon_right: skid_ribbon_right.set_skidding(false, Vector3.ZERO)
+		if skid_ribbon_center: skid_ribbon_center.set_skidding(false, Vector3.ZERO)
 
 	var target_volume = -80.0
 	if should_emit: target_volume = remap(clamp(drift_intensity, 0.18, 2.0), 0.18, 2.0, -10.0, 0.0)

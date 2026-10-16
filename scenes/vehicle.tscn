@@ -36,14 +36,6 @@ point_count = 3
 [sub_resource type="CurveTexture" id="CurveTexture_5pp1o"]
 curve = SubResource("Curve_bncg7")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_skid"]
-transparency = 1
-shading_mode = 0
-albedo_color = Color(0.12, 0.12, 0.14, 0.75)
-render_priority = 3
-
-[sub_resource type="PlaneMesh" id="PlaneMesh_skid"]
-size = Vector2(0.25, 0.35)
 
 [sub_resource type="QuadMesh" id="QuadMesh_68fxn"]
 
@@ -97,28 +89,6 @@ scale_amount_min = 0.25
 scale_amount_max = 0.5
 scale_amount_curve = SubResource("Curve_bncg7")
 color = Color(0.75, 0.76, 0.8, 0.7)
-
-[node name="SkidLeft" type="CPUParticles3D" parent="Container" unique_id=1450774766]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 0.045, -0.55)
-material_override = SubResource("StandardMaterial3D_skid")
-cast_shadow = 0
-emitting = false
-amount = 40
-lifetime = 3.5
-mesh = SubResource("PlaneMesh_skid")
-gravity = Vector3(0, 0, 0)
-local_coords = false
-
-[node name="SkidRight" type="CPUParticles3D" parent="Container" unique_id=1471178057]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 0.045, -0.55)
-material_override = SubResource("StandardMaterial3D_skid")
-cast_shadow = 0
-emitting = false
-amount = 40
-lifetime = 3.5
-mesh = SubResource("PlaneMesh_skid")
-gravity = Vector3(0, 0, 0)
-local_coords = false
 
 [node name="ScreechSound" type="AudioStreamPlayer3D" parent="Container" unique_id=1640227385]
 stream = ExtResource("4_mcce1")

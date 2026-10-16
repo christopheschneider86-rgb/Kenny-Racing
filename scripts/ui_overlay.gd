@@ -3,12 +3,11 @@ class_name UIOverlay extends CanvasLayer
 # Full In-Game UI Overlay for Kenny Racing
 # - Start Screen with:
 #   * Vehicle selection: Grundtyp & Farbe with live 3D preview & physics stats
-#   * World selection: Wald & Natur, Stadion, Rallye
+#   * World selection: Wald, Stadion, Rallye
 #   * Control mode toggle: Intuitiv / Klassisch
 #   * Streckenbauer with dedicated Back button
 # - Touch Virtual Joystick (Analog Stick)
-# - HUD with 4-Lap Counter, Lap Timer, and Best Lap Record
-# - Directional Wrong Way Warning ("! FALSCHE RICHTUNG ! Bitte umdrehen!")
+# - HUD with 4-Lap Counter, Lap Timer, and Best Lap Record (with real PNG icons)
 # - Countdown and Lap Announcements
 # - Victory Screen with Stars, Total Time, Best Lap Time, and Replay Buttons
 
@@ -29,8 +28,6 @@ var builder_screen: Control
 var lap_label: Label
 var time_label: Label
 var best_time_label: Label
-var wrong_way_panel: PanelContainer
-var wrong_way_tween: Tween
 var center_notification: Label
 var virtual_joystick: VirtualJoystick
 var mode_hud_button: Button
@@ -42,6 +39,7 @@ const VEHICLE_DATA = {
 		"name": "Racing Truck",
 		"desc": "Robuster Allround-Renn-Truck mit 4 Rädern & hoher Stabilität",
 		"stats": "Tempo: 7/10  •  Beschleunigung: 6/10  •  Grip: 9/10",
+		"icon": "res://sprites/icons/truck.png",
 		"colors": [
 			{"id": "yellow", "label": "Gelb", "color": Color(0.92, 0.82, 0.15)},
 			{"id": "red", "label": "Rot", "color": Color(0.88, 0.22, 0.22)},
@@ -53,6 +51,7 @@ const VEHICLE_DATA = {
 		"name": "Rennauto",
 		"desc": "Schneller Formel-Flitzer mit hoher Endgeschwindigkeit & Drifts",
 		"stats": "Tempo: 10/10  •  Beschleunigung: 8/10  •  Grip: 7/10",
+		"icon": "res://sprites/icons/racecar.png",
 		"colors": [
 			{"id": "red", "label": "Rot", "color": Color(0.88, 0.22, 0.22)},
 			{"id": "green", "label": "Grün", "color": Color(0.22, 0.8, 0.35)},
@@ -64,6 +63,7 @@ const VEHICLE_DATA = {
 		"name": "Motorrad",
 		"desc": "Sportliches Renn-Bike mit dynamischer Schräglage & Raketenantrieb",
 		"stats": "Tempo: 8/10  •  Beschleunigung: 10/10  •  Agilität: 10/10",
+		"icon": "res://sprites/icons/motorcycle.png",
 		"colors": [
 			{"id": "red", "label": "Renn-Rot", "color": Color(0.88, 0.22, 0.22)}
 		]
@@ -97,6 +97,7 @@ var current_type_idx: int = 0
 var current_color_idx: int = 0
 
 # Start Screen Nodes
+var type_icon_rect: TextureRect
 var type_label: Label
 var type_desc_label: Label
 var type_stats_label: Label
@@ -176,39 +177,59 @@ func _create_hud() -> void:
 	top_bar.add_theme_constant_override("separation", 12)
 	hud_screen.add_child(top_bar)
 
-	# Lap Badge
+	# Lap Badge (mit Flaggen-Icon)
 	var lap_panel = PanelContainer.new()
 	lap_panel.add_theme_stylebox_override("panel", _create_panel_style(Color(0.1, 0.15, 0.28, 0.92), Color(0.3, 0.7, 1.0), 16, 2))
 	top_bar.add_child(lap_panel)
+
+	var lap_box = HBoxContainer.new()
+	lap_box.add_theme_constant_override("separation", 8)
+	lap_panel.add_child(lap_box)
+
+	var lap_icon = _create_icon_rect("res://sprites/icons/flag_checkers.png", Vector2(26, 26))
+	lap_box.add_child(lap_icon)
 
 	lap_label = Label.new()
 	lap_label.text = "Runde: 1 / 4"
 	lap_label.add_theme_font_size_override("font_size", 20)
 	lap_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.35))
-	lap_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lap_panel.add_child(lap_label)
+	lap_box.add_child(lap_label)
 
-	# Timer Badge
+	# Timer Badge (mit Stoppuhr-Icon)
 	var time_panel = PanelContainer.new()
 	time_panel.add_theme_stylebox_override("panel", _create_panel_style(Color(0.1, 0.15, 0.28, 0.88), Color(1, 1, 1, 0.25), 16))
 	top_bar.add_child(time_panel)
+
+	var time_box = HBoxContainer.new()
+	time_box.add_theme_constant_override("separation", 8)
+	time_panel.add_child(time_box)
+
+	var time_icon = _create_icon_rect("res://sprites/icons/timer.png", Vector2(22, 22))
+	time_box.add_child(time_icon)
 
 	time_label = Label.new()
 	time_label.text = "Zeit: 00:00.00"
 	time_label.add_theme_font_size_override("font_size", 18)
 	time_label.add_theme_color_override("font_color", Color.WHITE)
-	time_panel.add_child(time_label)
+	time_box.add_child(time_label)
 
-	# Best Lap Badge
+	# Best Lap Badge (mit Stern-Icon)
 	var best_panel = PanelContainer.new()
 	best_panel.add_theme_stylebox_override("panel", _create_panel_style(Color(0.08, 0.22, 0.16, 0.88), Color(0.3, 0.85, 0.5, 0.8), 16))
 	top_bar.add_child(best_panel)
+
+	var best_box = HBoxContainer.new()
+	best_box.add_theme_constant_override("separation", 8)
+	best_panel.add_child(best_box)
+
+	var best_icon = _create_icon_rect("res://sprites/icons/star.png", Vector2(22, 22))
+	best_box.add_child(best_icon)
 
 	best_time_label = Label.new()
 	best_time_label.text = "Beste: --:--.--"
 	best_time_label.add_theme_font_size_override("font_size", 16)
 	best_time_label.add_theme_color_override("font_color", Color(0.5, 1.0, 0.7))
-	best_panel.add_child(best_time_label)
+	best_box.add_child(best_time_label)
 
 	# Spacer
 	var spacer = Control.new()
@@ -218,44 +239,11 @@ func _create_hud() -> void:
 
 	# Quick Menu Button
 	var menu_btn = Button.new()
-	menu_btn.text = "◀ Hauptmenü"
+	menu_btn.text = "Hauptmenü"
 	menu_btn.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(menu_btn, Color(0.2, 0.25, 0.38, 0.9), Color(0.35, 0.45, 0.65))
+	_apply_button_style(menu_btn, Color(0.2, 0.25, 0.38, 0.9), Color(0.35, 0.45, 0.65), 14, "res://sprites/icons/home.png")
 	menu_btn.pressed.connect(_on_menu_button_pressed)
 	top_bar.add_child(menu_btn)
-
-	# --- WRONG WAY ALERT ---
-	wrong_way_panel = PanelContainer.new()
-	wrong_way_panel.name = "WrongWayAlert"
-	wrong_way_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	wrong_way_panel.offset_top = 80
-	wrong_way_panel.offset_left = -210
-	wrong_way_panel.offset_right = 210
-	wrong_way_panel.offset_bottom = 150
-	wrong_way_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	wrong_way_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	wrong_way_panel.add_theme_stylebox_override("panel", _create_panel_style(Color(0.85, 0.12, 0.12, 0.96), Color(1.0, 0.85, 0.2), 20, 3))
-	hud_screen.add_child(wrong_way_panel)
-
-	var ww_vbox = VBoxContainer.new()
-	ww_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	wrong_way_panel.add_child(ww_vbox)
-
-	var ww_title = Label.new()
-	ww_title.text = "! FALSCHE RICHTUNG !"
-	ww_title.add_theme_font_size_override("font_size", 21)
-	ww_title.add_theme_color_override("font_color", Color.WHITE)
-	ww_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ww_vbox.add_child(ww_title)
-
-	var ww_sub = Label.new()
-	ww_sub.text = "Bitte umdrehen!"
-	ww_sub.add_theme_font_size_override("font_size", 15)
-	ww_sub.add_theme_color_override("font_color", Color(1.0, 0.95, 0.5))
-	ww_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ww_vbox.add_child(ww_sub)
-
-	wrong_way_panel.visible = false
 
 	# --- CENTER NOTIFICATION ---
 	center_notification = Label.new()
@@ -298,21 +286,21 @@ func _create_hud() -> void:
 	var hud_builder_btn = Button.new()
 	hud_builder_btn.text = "Streckenbauer"
 	hud_builder_btn.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(hud_builder_btn, Color(0.18, 0.45, 0.78, 0.9), Color(0.3, 0.65, 0.95))
+	_apply_button_style(hud_builder_btn, Color(0.18, 0.45, 0.78, 0.9), Color(0.3, 0.65, 0.95), 14, "res://sprites/icons/tools.png")
 	hud_builder_btn.pressed.connect(_open_builder)
 	action_box.add_child(hud_builder_btn)
 
 	var respawn_btn = Button.new()
-	respawn_btn.text = "↻ Auto zurücksetzen"
+	respawn_btn.text = "Auto zurücksetzen"
 	respawn_btn.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(respawn_btn, Color(0.85, 0.4, 0.15, 0.9), Color(1.0, 0.55, 0.25))
+	_apply_button_style(respawn_btn, Color(0.85, 0.4, 0.15, 0.9), Color(1.0, 0.55, 0.25), 14, "res://sprites/icons/reset.png")
 	respawn_btn.pressed.connect(_on_respawn_pressed)
 	action_box.add_child(respawn_btn)
 
 	mode_hud_button = Button.new()
 	mode_hud_button.text = "Modus: Intuitiv"
 	mode_hud_button.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(mode_hud_button, Color(0.2, 0.55, 0.85, 0.85), Color(0.3, 0.65, 0.95))
+	_apply_button_style(mode_hud_button, Color(0.2, 0.55, 0.85, 0.85), Color(0.3, 0.65, 0.95), 14, "res://sprites/icons/steering.png")
 	mode_hud_button.pressed.connect(_on_toggle_control_mode)
 	action_box.add_child(mode_hud_button)
 
@@ -346,7 +334,7 @@ func _create_start_screen() -> void:
 	showroom_badge.add_child(showroom_vbox)
 
 	var showroom_title = Label.new()
-	showroom_title.text = "★ 3D-SHOWROOM ★"
+	showroom_title.text = "3D-SHOWROOM"
 	showroom_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	showroom_title.add_theme_font_size_override("font_size", 14)
 	showroom_title.add_theme_color_override("font_color", Color(1.0, 0.92, 0.35))
@@ -428,22 +416,28 @@ func _create_start_screen() -> void:
 	type_panel.add_theme_stylebox_override("panel", _create_panel_style(Color(0.15, 0.22, 0.36, 0.9), Color(0.3, 0.65, 0.95), 14, 2))
 	type_carousel.add_child(type_panel)
 
-	var type_inner_vbox = VBoxContainer.new()
-	type_panel.add_child(type_inner_vbox)
+	var type_inner_hbox = HBoxContainer.new()
+	type_inner_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	type_inner_hbox.add_theme_constant_override("separation", 8)
+	type_panel.add_child(type_inner_hbox)
+
+	type_icon_rect = _create_icon_rect("res://sprites/icons/truck.png", Vector2(36, 36))
+	type_inner_hbox.add_child(type_icon_rect)
+
+	var type_text_vbox = VBoxContainer.new()
+	type_inner_hbox.add_child(type_text_vbox)
 
 	type_label = Label.new()
 	type_label.text = "Racing Truck"
-	type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	type_label.add_theme_font_size_override("font_size", 16)
 	type_label.add_theme_color_override("font_color", Color.WHITE)
-	type_inner_vbox.add_child(type_label)
+	type_text_vbox.add_child(type_label)
 
 	type_desc_label = Label.new()
 	type_desc_label.text = "Robuster Allround-Renn-Truck"
-	type_desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	type_desc_label.add_theme_font_size_override("font_size", 11)
 	type_desc_label.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
-	type_inner_vbox.add_child(type_desc_label)
+	type_text_vbox.add_child(type_desc_label)
 
 	var next_type_btn = Button.new()
 	next_type_btn.text = "▶"
@@ -495,16 +489,16 @@ func _create_start_screen() -> void:
 	card_vbox.add_child(world_hbox)
 
 	var worlds = [
-		{"id": "forest", "label": "Wald", "col": Color(0.2, 0.6, 0.3)},
-		{"id": "stadium", "label": "Stadion", "col": Color(0.2, 0.5, 0.85)},
-		{"id": "rally", "label": "Rallye", "col": Color(0.85, 0.5, 0.15)}
+		{"id": "forest", "label": "Wald", "col": Color(0.2, 0.6, 0.3), "icon": "res://sprites/icons/tree.png"},
+		{"id": "stadium", "label": "Stadion", "col": Color(0.2, 0.5, 0.85), "icon": "res://sprites/icons/stadium.png"},
+		{"id": "rally", "label": "Rallye", "col": Color(0.85, 0.5, 0.15), "icon": "res://sprites/icons/rally.png"}
 	]
 
 	for w in worlds:
 		var w_btn = Button.new()
 		w_btn.text = w["label"]
 		w_btn.add_theme_font_size_override("font_size", 13)
-		_apply_button_style(w_btn, w["col"] * 0.8, w["col"], 12)
+		_apply_button_style(w_btn, w["col"] * 0.8, w["col"], 12, w["icon"])
 		var wid: String = w["id"]
 		w_btn.pressed.connect(func(): _select_world(wid))
 		world_hbox.add_child(w_btn)
@@ -518,15 +512,15 @@ func _create_start_screen() -> void:
 	mode_start_button = Button.new()
 	mode_start_button.text = "Modus: Intuitiv"
 	mode_start_button.add_theme_font_size_override("font_size", 13)
-	_apply_button_style(mode_start_button, Color(0.18, 0.45, 0.75), Color(0.3, 0.65, 0.95), 12)
+	_apply_button_style(mode_start_button, Color(0.18, 0.45, 0.75), Color(0.3, 0.65, 0.95), 12, "res://sprites/icons/steering.png")
 	mode_start_button.pressed.connect(_on_toggle_control_mode)
 	card_vbox.add_child(mode_start_button)
 
 	# Big START Button
 	var start_btn = Button.new()
-	start_btn.text = "▶ Rennen starten (4 Runden)"
+	start_btn.text = "Rennen starten (4 Runden)"
 	start_btn.add_theme_font_size_override("font_size", 16)
-	_apply_button_style(start_btn, Color(0.18, 0.72, 0.35), Color(0.35, 0.95, 0.55), 15)
+	_apply_button_style(start_btn, Color(0.18, 0.72, 0.35), Color(0.35, 0.95, 0.55), 15, "res://sprites/icons/flag_checkers.png")
 	start_btn.pressed.connect(_on_start_button_pressed)
 	card_vbox.add_child(start_btn)
 
@@ -534,7 +528,7 @@ func _create_start_screen() -> void:
 	var builder_btn = Button.new()
 	builder_btn.text = "Streckenbauer (Eigene Strecke)"
 	builder_btn.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(builder_btn, Color(0.2, 0.45, 0.85), Color(0.4, 0.75, 1.0), 15)
+	_apply_button_style(builder_btn, Color(0.2, 0.45, 0.85), Color(0.4, 0.75, 1.0), 15, "res://sprites/icons/tools.png")
 	builder_btn.pressed.connect(_open_builder)
 	card_vbox.add_child(builder_btn)
 
@@ -550,16 +544,16 @@ func _create_track_builder_ui() -> void:
 	builder_screen.visible = false
 	root_control.add_child(builder_screen)
 
-	# Prominent Back Button (Top-Left, ALWAYS VISIBLE & CLEAR)
+	# Prominent Back Button (Top-Left)
 	var back_btn = Button.new()
-	back_btn.text = "◀ Zurück zum Menü"
+	back_btn.text = "Zurück zum Menü"
 	back_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	back_btn.offset_left = 18
 	back_btn.offset_top = 18
 	back_btn.offset_right = 210
 	back_btn.offset_bottom = 66
 	back_btn.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(back_btn, Color(0.18, 0.22, 0.35, 0.95), Color(0.45, 0.7, 1.0), 14)
+	_apply_button_style(back_btn, Color(0.18, 0.22, 0.35, 0.95), Color(0.45, 0.7, 1.0), 14, "res://sprites/icons/back.png")
 	back_btn.pressed.connect(func():
 		if track_builder:
 			track_builder.close_builder()
@@ -567,7 +561,7 @@ func _create_track_builder_ui() -> void:
 	)
 	builder_screen.add_child(back_btn)
 
-	# TOP TOOL BAR (Middle & Right of Top)
+	# TOP TOOL BAR
 	var top_panel = PanelContainer.new()
 	top_panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	top_panel.offset_left = 225
@@ -592,15 +586,15 @@ func _create_track_builder_ui() -> void:
 
 	# World selector
 	var b_worlds = [
-		{"id": "forest", "label": "Wald", "col": Color(0.2, 0.6, 0.3)},
-		{"id": "stadium", "label": "Stadion", "col": Color(0.2, 0.5, 0.85)},
-		{"id": "rally", "label": "Rallye", "col": Color(0.85, 0.5, 0.15)}
+		{"id": "forest", "label": "Wald", "col": Color(0.2, 0.6, 0.3), "icon": "res://sprites/icons/tree.png"},
+		{"id": "stadium", "label": "Stadion", "col": Color(0.2, 0.5, 0.85), "icon": "res://sprites/icons/stadium.png"},
+		{"id": "rally", "label": "Rallye", "col": Color(0.85, 0.5, 0.15), "icon": "res://sprites/icons/rally.png"}
 	]
 	for w in b_worlds:
 		var w_btn = Button.new()
 		w_btn.text = w["label"]
 		w_btn.add_theme_font_size_override("font_size", 13)
-		_apply_button_style(w_btn, w["col"] * 0.8, w["col"], 10)
+		_apply_button_style(w_btn, w["col"] * 0.8, w["col"], 10, w["icon"])
 		var wid: String = w["id"]
 		w_btn.pressed.connect(func(): _select_builder_world(wid))
 		top_hbox.add_child(w_btn)
@@ -647,9 +641,9 @@ func _create_track_builder_ui() -> void:
 
 	# Restore Default Track
 	var restore_btn = Button.new()
-	restore_btn.text = "↻ Standard"
+	restore_btn.text = "Standard"
 	restore_btn.add_theme_font_size_override("font_size", 12)
-	_apply_button_style(restore_btn, Color(0.25, 0.4, 0.6), Color(0.45, 0.7, 1.0), 10)
+	_apply_button_style(restore_btn, Color(0.25, 0.4, 0.6), Color(0.45, 0.7, 1.0), 10, "res://sprites/icons/reset.png")
 	restore_btn.pressed.connect(func():
 		if track_builder:
 			track_builder.restore_default_track()
@@ -659,9 +653,9 @@ func _create_track_builder_ui() -> void:
 
 	# Clear Grid
 	var clear_btn = Button.new()
-	clear_btn.text = "✕ Leeren"
+	clear_btn.text = "Leeren"
 	clear_btn.add_theme_font_size_override("font_size", 12)
-	_apply_button_style(clear_btn, Color(0.55, 0.2, 0.2), Color(0.85, 0.3, 0.3), 10)
+	_apply_button_style(clear_btn, Color(0.55, 0.2, 0.2), Color(0.85, 0.3, 0.3), 10, "res://sprites/icons/trash.png")
 	clear_btn.pressed.connect(func():
 		if track_builder:
 			track_builder.clear_all()
@@ -692,7 +686,7 @@ func _create_track_builder_ui() -> void:
 	var cat_road_btn = Button.new()
 	cat_road_btn.text = "Straßen"
 	cat_road_btn.add_theme_font_size_override("font_size", 14)
-	_apply_button_style(cat_road_btn, Color(0.2, 0.45, 0.75), Color(0.4, 0.75, 1.0), 12)
+	_apply_button_style(cat_road_btn, Color(0.2, 0.45, 0.75), Color(0.4, 0.75, 1.0), 12, "res://sprites/icons/road_straight.png")
 	cat_road_btn.pressed.connect(func(): _switch_builder_category("road"))
 	b_controls_row.add_child(cat_road_btn)
 	builder_category_buttons["road"] = cat_road_btn
@@ -700,7 +694,7 @@ func _create_track_builder_ui() -> void:
 	var cat_props_btn = Button.new()
 	cat_props_btn.text = "Deko & Bausatz"
 	cat_props_btn.add_theme_font_size_override("font_size", 14)
-	_apply_button_style(cat_props_btn, Color(0.2, 0.3, 0.45), Color(0.3, 0.45, 0.7), 12)
+	_apply_button_style(cat_props_btn, Color(0.2, 0.3, 0.45), Color(0.3, 0.45, 0.7), 12, "res://sprites/icons/tree.png")
 	cat_props_btn.pressed.connect(func(): _switch_builder_category("props"))
 	b_controls_row.add_child(cat_props_btn)
 	builder_category_buttons["props"] = cat_props_btn
@@ -709,9 +703,9 @@ func _create_track_builder_ui() -> void:
 
 	# Rotate Button
 	builder_rotate_button = Button.new()
-	builder_rotate_button.text = "↻ Drehen (R): 0°"
+	builder_rotate_button.text = "Drehen (R): 0°"
 	builder_rotate_button.add_theme_font_size_override("font_size", 14)
-	_apply_button_style(builder_rotate_button, Color(0.25, 0.35, 0.55), Color(0.45, 0.65, 0.95), 14)
+	_apply_button_style(builder_rotate_button, Color(0.25, 0.35, 0.55), Color(0.45, 0.65, 0.95), 14, "res://sprites/icons/reset.png")
 	builder_rotate_button.pressed.connect(func():
 		if track_builder:
 			track_builder.rotate_piece()
@@ -722,9 +716,9 @@ func _create_track_builder_ui() -> void:
 
 	# Big Test Drive Button
 	var drive_btn = Button.new()
-	drive_btn.text = "▶ Testfahrt starten"
+	drive_btn.text = "Testfahrt starten"
 	drive_btn.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(drive_btn, Color(0.18, 0.72, 0.35), Color(0.35, 0.95, 0.55), 15)
+	_apply_button_style(drive_btn, Color(0.18, 0.72, 0.35), Color(0.35, 0.95, 0.55), 15, "res://sprites/icons/flag_checkers.png")
 	drive_btn.pressed.connect(func():
 		if track_builder:
 			track_builder.start_test_drive()
@@ -752,11 +746,11 @@ func _create_track_builder_ui() -> void:
 	tools_stack.add_child(builder_road_scroll_box)
 
 	var roads = [
-		{"id": 4, "name": "Start / Ziel"},
-		{"id": 6, "name": "Gerade"},
-		{"id": 3, "name": "Kurve"},
-		{"id": 5, "name": "Rampe"},
-		{"id": -1, "name": "✕ Löschen"}
+		{"id": 4, "name": "Start / Ziel", "icon": "res://sprites/icons/flag_checkers.png"},
+		{"id": 6, "name": "Gerade", "icon": "res://sprites/icons/road_straight.png"},
+		{"id": 3, "name": "Kurve", "icon": "res://sprites/icons/road_corner.png"},
+		{"id": 5, "name": "Rampe", "icon": "res://sprites/icons/road_ramp.png"},
+		{"id": -1, "name": "Löschen", "icon": "res://sprites/icons/trash.png"}
 	]
 	for r in roads:
 		var r_btn = Button.new()
@@ -765,7 +759,7 @@ func _create_track_builder_ui() -> void:
 		var item_id: int = r["id"]
 		var base_col = Color(0.55, 0.2, 0.2, 0.85) if item_id == -1 else Color(0.2, 0.4, 0.65, 0.85)
 		var border_col = Color(0.85, 0.3, 0.3) if item_id == -1 else Color(0.35, 0.7, 1.0)
-		_apply_button_style(r_btn, base_col, border_col, 12)
+		_apply_button_style(r_btn, base_col, border_col, 12, r["icon"])
 		r_btn.pressed.connect(func():
 			if item_id == -1:
 				if track_builder: track_builder.select_erase_tool()
@@ -815,14 +809,14 @@ func _switch_builder_category(cat: String) -> void:
 	builder_props_scroll_box.visible = (cat == "props")
 
 	if cat == "road":
-		_apply_button_style(builder_category_buttons["road"], Color(0.2, 0.45, 0.75), Color(0.4, 0.75, 1.0), 12)
-		_apply_button_style(builder_category_buttons["props"], Color(0.2, 0.3, 0.45), Color(0.3, 0.45, 0.7), 12)
+		_apply_button_style(builder_category_buttons["road"], Color(0.2, 0.45, 0.75), Color(0.4, 0.75, 1.0), 12, "res://sprites/icons/road_straight.png")
+		_apply_button_style(builder_category_buttons["props"], Color(0.2, 0.3, 0.45), Color(0.3, 0.45, 0.7), 12, "res://sprites/icons/tree.png")
 		if track_builder:
 			track_builder.select_road_tool(6)
 			_highlight_builder_road_button(6)
 	else:
-		_apply_button_style(builder_category_buttons["props"], Color(0.2, 0.5, 0.35), Color(0.35, 0.85, 0.55), 12)
-		_apply_button_style(builder_category_buttons["road"], Color(0.2, 0.3, 0.45), Color(0.3, 0.45, 0.7), 12)
+		_apply_button_style(builder_category_buttons["props"], Color(0.2, 0.5, 0.35), Color(0.35, 0.85, 0.55), 12, "res://sprites/icons/tree.png")
+		_apply_button_style(builder_category_buttons["road"], Color(0.2, 0.3, 0.45), Color(0.3, 0.45, 0.7), 12, "res://sprites/icons/road_straight.png")
 		var props = THEME_PROPS.get(builder_active_world, THEME_PROPS["forest"])
 		if props.size() > 0 and track_builder:
 			track_builder.select_prop_tool(props[0]["path"], props[0]["name"])
@@ -851,7 +845,7 @@ func _refresh_builder_props_for_world(world_id: String) -> void:
 		var p_btn = Button.new()
 		p_btn.text = p_info["name"]
 		p_btn.add_theme_font_size_override("font_size", 13)
-		_apply_button_style(p_btn, Color(0.2, 0.38, 0.28, 0.9), Color(0.35, 0.8, 0.5), 12)
+		_apply_button_style(p_btn, Color(0.2, 0.38, 0.28, 0.9), Color(0.35, 0.8, 0.5), 12, "res://sprites/icons/tree.png")
 		var p_path: String = p_info["path"]
 		var p_name: String = p_info["name"]
 		p_btn.pressed.connect(func():
@@ -880,7 +874,7 @@ func _connect_builder_signals() -> void:
 		return
 	track_builder.orientation_changed.connect(func(deg: int):
 		if builder_rotate_button:
-			builder_rotate_button.text = "↻ Drehen (R): %d°" % deg
+			builder_rotate_button.text = "Drehen (R): %d°" % deg
 	)
 
 # ==============================================================================
@@ -914,7 +908,7 @@ func _create_victory_screen() -> void:
 	card.add_child(v_vbox)
 
 	var win_title = Label.new()
-	win_title.text = "★ SUPER GEMACHT! ★"
+	win_title.text = "SUPER GEMACHT!"
 	win_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	win_title.add_theme_font_size_override("font_size", 28)
 	win_title.add_theme_color_override("font_color", Color(1.0, 0.92, 0.3))
@@ -929,12 +923,15 @@ func _create_victory_screen() -> void:
 	win_sub.add_theme_color_override("font_color", Color.WHITE)
 	v_vbox.add_child(win_sub)
 
-	var stars = Label.new()
-	stars.text = "★★★"
-	stars.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	stars.add_theme_font_size_override("font_size", 38)
-	stars.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
-	v_vbox.add_child(stars)
+	# Stars row with PNG icons
+	var stars_hbox = HBoxContainer.new()
+	stars_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	stars_hbox.add_theme_constant_override("separation", 12)
+	v_vbox.add_child(stars_hbox)
+
+	for _i in range(3):
+		var star_icon = _create_icon_rect("res://sprites/icons/star.png", Vector2(40, 40))
+		stars_hbox.add_child(star_icon)
 
 	victory_time_label = Label.new()
 	victory_time_label.text = "Gesamtzeit: 01:25.00"
@@ -956,16 +953,16 @@ func _create_victory_screen() -> void:
 	v_vbox.add_child(btn_hbox)
 
 	var replay_btn = Button.new()
-	replay_btn.text = "↻ Nochmal spielen"
+	replay_btn.text = "Nochmal spielen"
 	replay_btn.add_theme_font_size_override("font_size", 17)
-	_apply_button_style(replay_btn, Color(0.2, 0.65, 0.95), Color(0.35, 0.8, 1.0))
+	_apply_button_style(replay_btn, Color(0.2, 0.65, 0.95), Color(0.35, 0.8, 1.0), 14, "res://sprites/icons/reset.png")
 	replay_btn.pressed.connect(_on_start_button_pressed)
 	btn_hbox.add_child(replay_btn)
 
 	var main_menu_btn = Button.new()
-	main_menu_btn.text = "◀ Hauptmenü"
+	main_menu_btn.text = "Hauptmenü"
 	main_menu_btn.add_theme_font_size_override("font_size", 17)
-	_apply_button_style(main_menu_btn, Color(0.25, 0.3, 0.45), Color(0.35, 0.42, 0.6))
+	_apply_button_style(main_menu_btn, Color(0.25, 0.3, 0.45), Color(0.35, 0.42, 0.6), 14, "res://sprites/icons/home.png")
 	main_menu_btn.pressed.connect(_on_menu_button_pressed)
 	btn_hbox.add_child(main_menu_btn)
 
@@ -997,6 +994,8 @@ func _refresh_vehicle_display() -> void:
 		type_desc_label.text = data["desc"]
 	if type_stats_label:
 		type_stats_label.text = data["stats"]
+	if type_icon_rect and ResourceLoader.exists(data["icon"]):
+		type_icon_rect.texture = load(data["icon"])
 
 	for c in color_chips_box.get_children():
 		c.queue_free()
@@ -1074,7 +1073,6 @@ func _connect_race_signals() -> void:
 	race_manager.race_state_changed.connect(_on_race_state_changed)
 	race_manager.countdown_tick.connect(_on_countdown_tick)
 	race_manager.lap_updated.connect(_on_lap_updated)
-	race_manager.wrong_way_toggled.connect(_on_wrong_way_toggled)
 	race_manager.race_finished.connect(_on_race_finished)
 
 func _process(delta: float) -> void:
@@ -1121,7 +1119,7 @@ func _on_toggle_control_mode() -> void:
 	var new_mode = vehicle.toggle_control_mode()
 	var is_direct = (new_mode == Vehicle.ControlMode.DIRECT_DIRECTION)
 
-	var label_start = "Modus: Intuitiv (Stick zeigt Richtung)" if is_direct else "Modus: Klassisch (Gas & Lenken)"
+	var label_start = "Modus: Intuitiv" if is_direct else "Modus: Klassisch"
 	var label_hud = "Modus: Intuitiv" if is_direct else "Modus: Klassisch"
 
 	if mode_start_button:
@@ -1180,20 +1178,6 @@ func _show_temporary_banner(msg: String, duration: float) -> void:
 		center_notification.modulate.a = 1.0
 	)
 
-func _on_wrong_way_toggled(is_wrong: bool) -> void:
-	if wrong_way_panel:
-		wrong_way_panel.visible = is_wrong
-		if is_wrong:
-			if wrong_way_tween and wrong_way_tween.is_valid():
-				wrong_way_tween.kill()
-			wrong_way_tween = create_tween().set_loops()
-			wrong_way_tween.tween_property(wrong_way_panel, "modulate:a", 0.4, 0.35)
-			wrong_way_tween.tween_property(wrong_way_panel, "modulate:a", 1.0, 0.35)
-		else:
-			if wrong_way_tween and wrong_way_tween.is_valid():
-				wrong_way_tween.kill()
-			wrong_way_panel.modulate.a = 1.0
-
 func _on_race_finished(total_time: float, best_lap: float = 0.0) -> void:
 	_show_screen("victory")
 	if victory_time_label and race_manager:
@@ -1205,8 +1189,17 @@ func _on_race_finished(total_time: float, best_lap: float = 0.0) -> void:
 			victory_best_label.text = "Schnellste Runde: " + race_manager.format_time(total_time / 4.0)
 
 # ==============================================================================
-# 7. UI STYLING HELPERS
+# 7. UI STYLING & ICON HELPERS
 # ==============================================================================
+
+func _create_icon_rect(icon_path: String, size: Vector2) -> TextureRect:
+	var tr = TextureRect.new()
+	if icon_path != "" and ResourceLoader.exists(icon_path):
+		tr.texture = load(icon_path)
+	tr.custom_minimum_size = size
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	return tr
 
 func _create_panel_style(bg: Color, border: Color = Color.TRANSPARENT, radius: int = 18, border_w: int = 2) -> StyleBoxFlat:
 	var sb = StyleBoxFlat.new()
@@ -1227,7 +1220,7 @@ func _create_panel_style(bg: Color, border: Color = Color.TRANSPARENT, radius: i
 		sb.border_color = border
 	return sb
 
-func _apply_button_style(btn: Button, bg: Color, border: Color = Color.TRANSPARENT, radius: int = 14) -> void:
+func _apply_button_style(btn: Button, bg: Color, border: Color = Color.TRANSPARENT, radius: int = 14, icon_path: String = "") -> void:
 	var normal_sb = _create_panel_style(bg, border, radius, 2)
 	var hover_sb = _create_panel_style(bg.lightened(0.15), border.lightened(0.2), radius, 2)
 	var pressed_sb = _create_panel_style(bg.darkened(0.15), border.darkened(0.1), radius, 2)
@@ -1238,3 +1231,9 @@ func _apply_button_style(btn: Button, bg: Color, border: Color = Color.TRANSPARE
 	btn.add_theme_color_override("font_color", Color.WHITE)
 	btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.8))
 	btn.add_theme_color_override("font_pressed_color", Color(0.85, 0.85, 0.85))
+
+	if icon_path != "" and ResourceLoader.exists(icon_path):
+		btn.icon = load(icon_path)
+		btn.expand_icon = true
+		btn.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.add_theme_constant_override("h_separation", 8)
