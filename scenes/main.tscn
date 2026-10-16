@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://scripts/race_manager.gd" id="13_race_manager"]
 [ext_resource type="Script" path="res://scripts/ui_overlay.gd" id="14_ui_overlay"]
 [ext_resource type="Script" path="res://scripts/track_manager.gd" id="15_track_manager"]
+[ext_resource type="Script" path="res://scripts/track_builder.gd" id="16_track_builder"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_ya4ey"]
 size = Vector3(60, 0, 60)
@@ -42,6 +43,8 @@ far = 60.0
 
 [node name="Sun" type="DirectionalLight3D" parent="." unique_id=385873465]
 transform = Transform3D(-0.422618, -0.694272, 0.582564, 0, 0.642788, 0.766044, -0.906308, 0.323744, -0.271654, 0, 0, 0)
+light_color = Color(1, 0.98, 0.94, 1)
+light_energy = 0.85
 shadow_enabled = true
 shadow_bias = 0.2
 shadow_normal_bias = 1.0
@@ -89,9 +92,19 @@ script = ExtResource("15_track_manager")
 sun_light = NodePath("../Sun")
 environment = NodePath("../Environment")
 
-[node name="UIOverlay" type="CanvasLayer" parent="." unique_id=1910001003 node_paths=PackedStringArray("race_manager", "vehicle", "sound_effects", "track_manager")]
+[node name="TrackBuilder" type="Node" parent="." unique_id=1910001005 node_paths=PackedStringArray("grid_map", "view_node", "race_manager", "track_manager", "vehicle", "sound_effects")]
+script = ExtResource("16_track_builder")
+grid_map = NodePath("../GridMap")
+view_node = NodePath("../View")
+race_manager = NodePath("../RaceManager")
+track_manager = NodePath("../TrackManager")
+vehicle = NodePath("../Vehicle")
+sound_effects = NodePath("../SoundEffects")
+
+[node name="UIOverlay" type="CanvasLayer" parent="." unique_id=1910001003 node_paths=PackedStringArray("race_manager", "vehicle", "sound_effects", "track_manager", "track_builder")]
 script = ExtResource("14_ui_overlay")
 race_manager = NodePath("../RaceManager")
 vehicle = NodePath("../Vehicle")
 sound_effects = NodePath("../SoundEffects")
 track_manager = NodePath("../TrackManager")
+track_builder = NodePath("../TrackBuilder")

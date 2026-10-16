@@ -74,9 +74,28 @@ func _build_waypoints() -> void:
 func _place_vehicle_at_start() -> void:
 	if not vehicle:
 		return
-	var start_pos = Vector3(3.5, 0.0, 4.0)
+	var start_pos = Vector3(3.75, 0.0, 3.75)
 	var forward = Vector3(0.0, 0.0, 1.0)
+
+	if grid_map:
+		for cell in grid_map.get_used_cells():
+			if grid_map.get_cell_item(cell) == 4: # track-finish
+				var loc = grid_map.map_to_local(cell)
+				start_pos = grid_map.to_global(loc)
+				start_pos.y = 0.0
+				var orient = grid_map.get_cell_item_orientation(cell)
+				forward = _get_forward_from_orientation(orient)
+				break
+
 	vehicle.respawn_to(start_pos, forward)
+
+func _get_forward_from_orientation(orient: int) -> Vector3:
+	match orient:
+		0: return Vector3(0.0, 0.0, 1.0)
+		16: return Vector3(-1.0, 0.0, 0.0)
+		10: return Vector3(0.0, 0.0, -1.0)
+		22: return Vector3(1.0, 0.0, 0.0)
+		_: return Vector3(0.0, 0.0, 1.0)
 
 func show_main_menu() -> void:
 	current_state = GameState.MENU
@@ -215,29 +234,30 @@ func _update_track_progress(delta: float) -> void:
 	var p1 = track_waypoints[(current_segment + 1) % n]
 	var seg_dir = Vector3(p1.x - p0.x, 0.0, p1.z - p0.z).normalized()
 
-	var car_fwd = vehicle.vehicle_model.global_basis.z
+	# Forward direction in Godot is -basis.z
+	var car_fwd = -vehicle.vehicle_model.global_basis.z
 	car_fwd.y = 0.0
 	car_fwd = car_fwd.normalized()
 
 	var dot = car_fwd.dot(seg_dir)
 
-	# If moving fast backward, consider velocity direction
+	# If moving with significant velocity, combine facing direction and movement
 	var vel = vehicle.linear_velocity
 	var vel_2d = Vector3(vel.x, 0.0, vel.z)
-	if vel_2d.length() > 1.2:
+	if vel_2d.length() > 1.5:
 		var move_dot = vel_2d.normalized().dot(seg_dir)
-		if move_dot < -0.3:
-			dot = minf(dot, move_dot)
+		dot = (dot + move_dot) * 0.5
 
-	if dot < -0.2:
+	# Only alert if facing opposite to track direction for more than 0.6s
+	if dot < -0.3:
 		wrong_way_timer += delta
-		if wrong_way_timer > 0.25:
+		if wrong_way_timer > 0.6:
 			if not is_wrong_way:
 				is_wrong_way = true
 				wrong_way_toggled.emit(true)
 				if sound_effects:
 					sound_effects.play_wrong_way_alert()
-	elif dot > 0.1:
+	elif dot > 0.0:
 		wrong_way_timer = 0.0
 		if is_wrong_way:
 			is_wrong_way = false

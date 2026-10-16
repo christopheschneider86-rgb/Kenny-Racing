@@ -23,8 +23,8 @@ const WORLDS_INFO = {
 		"name": "🌲 Wald & Natur",
 		"tagline": "Grüne Rundstrecke im Wald mit Campingzelten und Baumreihen",
 		"sun_color": Color(1.0, 0.98, 0.92),
-		"sun_energy": 1.1,
-		"ambient_color": Color(0.3, 0.5, 0.35),
+		"sun_energy": 0.85,
+		"ambient_color": Color(0.24, 0.28, 0.25),
 		"kits": [
 			{
 				"category": "🛣️ Straßen & Fahrbahn",
@@ -61,8 +61,8 @@ const WORLDS_INFO = {
 		"name": "🏟️ Grand Prix Stadion",
 		"tagline": "Motorsport-Arena mit Tribünen, Boxengasse, Flutlicht und Anzeigetafeln",
 		"sun_color": Color(0.98, 0.98, 1.0),
-		"sun_energy": 1.25,
-		"ambient_color": Color(0.35, 0.45, 0.6),
+		"sun_energy": 0.85,
+		"ambient_color": Color(0.26, 0.28, 0.34),
 		"kits": [
 			{
 				"category": "🛣️ GP-Strecke & Boxengasse",
@@ -100,8 +100,8 @@ const WORLDS_INFO = {
 		"name": "🏜️ Wüsten-Rallye & Sand",
 		"tagline": "Staubige Rallyestrecke mit Sprungschanzen, Sandkurven und Reifenstapeln",
 		"sun_color": Color(1.0, 0.9, 0.75),
-		"sun_energy": 1.3,
-		"ambient_color": Color(0.55, 0.45, 0.3),
+		"sun_energy": 0.85,
+		"ambient_color": Color(0.28, 0.25, 0.22),
 		"kits": [
 			{
 				"category": "🛣️ Rallye-Track & Schanzen",
@@ -184,25 +184,25 @@ func _build_stadium_scenery() -> void:
 	var grandstand_z = [-7.5, 0.0, 7.5]
 	for z in grandstand_z:
 		_spawn_prop("res://kenney_racing-kit/Models/GLTF format/grandStandCovered.glb",
-			Vector3(9.5, 0.0, z), Vector3(0, -PI/2, 0), Vector3(8, 8, 8))
+			Vector3(9.5, 0.0, z), Vector3(0, -PI/2, 0), Vector3(1.2, 1.2, 1.2))
 
 	# Pit Garages on opposite straight side
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/pitsGarage.glb",
-		Vector3(-5.5, 0.0, 3.5), Vector3(0, PI/2, 0), Vector3(8, 8, 8))
+		Vector3(-5.5, 0.0, 3.5), Vector3(0, PI/2, 0), Vector3(1.0, 1.0, 1.0))
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/pitsGarage.glb",
-		Vector3(-5.5, 0.0, 11.0), Vector3(0, PI/2, 0), Vector3(8, 8, 8))
+		Vector3(-5.5, 0.0, 11.0), Vector3(0, PI/2, 0), Vector3(1.0, 1.0, 1.0))
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/pitsOffice.glb",
-		Vector3(-5.5, 0.0, -4.0), Vector3(0, PI/2, 0), Vector3(8, 8, 8))
+		Vector3(-5.5, 0.0, -4.0), Vector3(0, PI/2, 0), Vector3(1.0, 1.0, 1.0))
 
 	# Overhead Gantry at Start/Finish
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/overheadRoundColored.glb",
-		Vector3(3.75, 0.0, 3.75), Vector3(0, 0, 0), Vector3(8, 8, 8))
+		Vector3(3.75, 0.0, 3.75), Vector3(0, 0, 0), Vector3(1.0, 1.0, 1.0))
 
 	# Billboards along far back-straight
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/billboard.glb",
-		Vector3(-11.24, 0.0, -23.0), Vector3(0, 0, 0), Vector3(8, 8, 8))
+		Vector3(-11.24, 0.0, -23.0), Vector3(0, 0, 0), Vector3(1.0, 1.0, 1.0))
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/billboardDouble_exclusive.glb",
-		Vector3(-3.75, 0.0, -23.0), Vector3(0, 0, 0), Vector3(8, 8, 8))
+		Vector3(-3.75, 0.0, -23.0), Vector3(0, 0, 0), Vector3(1.0, 1.0, 1.0))
 
 	# Floodlights at 4 corners
 	var flood_positions = [
@@ -213,13 +213,13 @@ func _build_stadium_scenery() -> void:
 	]
 	for p in flood_positions:
 		_spawn_prop("res://kenney_racing-kit/Models/GLTF format/lightPostLarge.glb",
-			p, Vector3.ZERO, Vector3(8, 8, 8))
+			p, Vector3.ZERO, Vector3(1.0, 1.0, 1.0))
 
 	# Checkered flags
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/flagCheckers.glb",
-		Vector3(1.0, 0.0, 3.75), Vector3.ZERO, Vector3(8, 8, 8))
+		Vector3(1.0, 0.0, 3.75), Vector3.ZERO, Vector3(1.0, 1.0, 1.0))
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/flagCheckers.glb",
-		Vector3(6.5, 0.0, 3.75), Vector3.ZERO, Vector3(8, 8, 8))
+		Vector3(6.5, 0.0, 3.75), Vector3.ZERO, Vector3(1.0, 1.0, 1.0))
 
 func _build_rally_scenery() -> void:
 	# Red & White Barriers on outer curves
@@ -234,19 +234,19 @@ func _build_rally_scenery() -> void:
 		var glb = "barrierRed.glb" if toggle else "barrierWhite.glb"
 		toggle = !toggle
 		_spawn_prop("res://kenney_racing-kit/Models/GLTF format/" + glb,
-			p, Vector3.ZERO, Vector3(7, 7, 7))
+			p, Vector3.ZERO, Vector3(1.0, 1.0, 1.0))
 
 	# Fences
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/fenceStraight.glb",
-		Vector3(8.5, 0.0, 0.0), Vector3(0, PI/2, 0), Vector3(7, 7, 7))
+		Vector3(8.5, 0.0, 0.0), Vector3(0, PI/2, 0), Vector3(1.0, 1.0, 1.0))
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/fenceStraight.glb",
-		Vector3(8.5, 0.0, 7.5), Vector3(0, PI/2, 0), Vector3(7, 7, 7))
+		Vector3(8.5, 0.0, 7.5), Vector3(0, PI/2, 0), Vector3(1.0, 1.0, 1.0))
 
 	# Banner Towers
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/bannerTowerRed.glb",
-		Vector3(7.5, 0.0, 3.75), Vector3.ZERO, Vector3(7, 7, 7))
+		Vector3(7.5, 0.0, 3.75), Vector3.ZERO, Vector3(1.0, 1.0, 1.0))
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/bannerTowerGreen.glb",
-		Vector3(0.0, 0.0, 3.75), Vector3.ZERO, Vector3(7, 7, 7))
+		Vector3(0.0, 0.0, 3.75), Vector3.ZERO, Vector3(1.0, 1.0, 1.0))
 
 	# Pylons
 	var pylon_positions = [
@@ -255,7 +255,7 @@ func _build_rally_scenery() -> void:
 	]
 	for py in pylon_positions:
 		_spawn_prop("res://kenney_racing-kit/Models/GLTF format/pylon.glb",
-			py, Vector3.ZERO, Vector3(6, 6, 6))
+			py, Vector3.ZERO, Vector3(1.0, 1.0, 1.0))
 
 func _build_forest_scenery() -> void:
 	# Trees around the track
@@ -271,13 +271,13 @@ func _build_forest_scenery() -> void:
 	]
 	for p in tree_positions:
 		_spawn_prop("res://kenney_racing-kit/Models/GLTF format/treeLarge.glb",
-			p, Vector3.ZERO, Vector3(7, 7, 7))
+			p, Vector3.ZERO, Vector3(1.25, 1.25, 1.25))
 
 	# Tents
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/tent.glb",
-		Vector3(12.0, 0.0, -2.0), Vector3(0, PI/3, 0), Vector3(6, 6, 6))
+		Vector3(12.0, 0.0, -2.0), Vector3(0, PI/3, 0), Vector3(1.0, 1.0, 1.0))
 	_spawn_prop("res://kenney_racing-kit/Models/GLTF format/tentLong.glb",
-		Vector3(13.0, 0.0, 4.0), Vector3(0, -PI/4, 0), Vector3(6, 6, 6))
+		Vector3(13.0, 0.0, 4.0), Vector3(0, -PI/4, 0), Vector3(1.0, 1.0, 1.0))
 
 func _spawn_prop(glb_path: String, pos: Vector3, rot: Vector3, sc: Vector3) -> void:
 	if not ResourceLoader.exists(glb_path):

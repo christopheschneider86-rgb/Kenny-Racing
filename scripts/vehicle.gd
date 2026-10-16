@@ -28,6 +28,10 @@ var motorcycle_mesh: Node3D
 
 @onready var trail_left = get_node_or_null("Container/TrailLeft")
 @onready var trail_right = get_node_or_null("Container/TrailRight")
+@onready var skid_left = get_node_or_null("Container/SkidLeft")
+@onready var skid_right = get_node_or_null("Container/SkidRight")
+
+var vehicle_body_default_pos: Vector3 = Vector3(0, 0.4, 0)
 
 # Sounds
 
@@ -63,6 +67,8 @@ func _ready() -> void:
 
 func _init_wheel_references() -> void:
 	vehicle_body = find_child("body", true, false)
+	if vehicle_body:
+		vehicle_body_default_pos = vehicle_body.position
 	wheel_fl = find_child("wheel-front-left", true, false)
 	if not wheel_fl: wheel_fl = find_child("wheelFrontLeft", true, false)
 	wheel_fr = find_child("wheel-front-right", true, false)
@@ -78,6 +84,9 @@ func _init_wheel_references() -> void:
 	motorcycle_mesh = find_child("motorcycle", true, false)
 
 # Public Functions
+
+func rotate_showroom(delta: float) -> void:
+	vehicle_model.rotate_y(delta * 0.75)
 
 func get_vehicle_position() -> Vector3:
 	return vehicle_model.global_position
@@ -100,12 +109,9 @@ func respawn_to(target_pos: Vector3, forward_dir: Vector3) -> void:
 
 	var fwd = Vector3(forward_dir.x, 0.0, forward_dir.z).normalized()
 	if fwd.is_zero_approx():
-		fwd = Vector3.FORWARD
-	var up = Vector3.UP
-	var right = up.cross(fwd).normalized()
-	up = fwd.cross(right).normalized()
-	var new_basis = Basis(right, up, fwd)
+		fwd = Vector3(0, 0, 1)
 
+	var new_basis = Basis.looking_at(fwd, Vector3.UP)
 	vehicle_model.global_transform = Transform3D(new_basis, target_pos)
 	raycast.global_position = sphere.global_position
 
@@ -141,8 +147,20 @@ func set_vehicle(type_name: String, color_name: String) -> void:
 	var new_model = scene.instantiate()
 	new_model.name = "Model"
 	$Container.add_child(new_model)
+	new_model.position = Vector3.ZERO
+	new_model.rotation = Vector3.ZERO
+
+	if current_vehicle_type == "racecar":
+		new_model.scale = Vector3(1.4, 1.4, 1.4)
+		_apply_racecar_paint(new_model, current_vehicle_color)
+	elif current_vehicle_type == "motorcycle":
+		new_model.scale = Vector3(1.2, 1.2, 1.2)
+	else:
+		new_model.scale = Vector3(1.0, 1.0, 1.0)
 
 	vehicle_body = new_model.find_child("body", true, false)
+	if vehicle_body:
+		vehicle_body_default_pos = vehicle_body.position
 
 	wheel_fl = new_model.find_child("wheel-front-left", true, false)
 	if not wheel_fl: wheel_fl = new_model.find_child("wheelFrontLeft", true, false)
@@ -160,6 +178,33 @@ func set_vehicle(type_name: String, color_name: String) -> void:
 	wheel_back = new_model.find_child("wheel-back", true, false)
 	fork = new_model.find_child("fork", true, false)
 	motorcycle_mesh = new_model.find_child("motorcycle", true, false)
+
+func _apply_racecar_paint(model_node: Node, color_key: String) -> void:
+	var color_map = {
+		"red": Color(0.92, 0.15, 0.15),
+		"green": Color(0.18, 0.8, 0.32),
+		"orange": Color(0.98, 0.52, 0.12),
+		"white": Color(0.96, 0.96, 0.98),
+		"yellow": Color(0.96, 0.85, 0.15),
+		"purple": Color(0.72, 0.28, 0.88),
+	}
+	var paint_color: Color = color_map.get(color_key, Color(0.92, 0.15, 0.15))
+
+	var meshes = model_node.find_children("*", "MeshInstance3D", true, false)
+	for mi in meshes:
+		if mi is MeshInstance3D and mi.mesh:
+			for s in range(mi.mesh.get_surface_count()):
+				var mat = mi.get_surface_override_material(s)
+				if mat == null:
+					mat = mi.mesh.surface_get_material(s)
+				if mat is StandardMaterial3D:
+					var m_name = mat.resource_name.to_lower()
+					if not ("tire" in m_name or "glass" in m_name or "black" in m_name):
+						var dup_mat: StandardMaterial3D = mat.duplicate()
+						dup_mat.albedo_color = paint_color
+						dup_mat.roughness = 0.35
+						dup_mat.metallic = 0.25
+						mi.set_surface_override_material(s, dup_mat)
 
 func set_truck_color(color_name: String) -> void:
 	set_vehicle("truck", color_name)
@@ -185,7 +230,7 @@ func _physics_process(delta):
 
 	if raycast.is_colliding():
 		if !colliding:
-			if vehicle_body != null: vehicle_body.position = Vector3(0, 0.1, 0) # Bounce
+			if vehicle_body != null: vehicle_body.position = vehicle_body_default_pos + Vector3(0, 0.08, 0) # Bounce
 			input.z = 0
 
 		normal = raycast.get_collision_normal()
@@ -295,7 +340,7 @@ func effect_body(delta):
 	if vehicle_body != null:
 		vehicle_body.rotation.x = lerp_angle(vehicle_body.rotation.x, -(linear_speed - acceleration) / 6, delta * 10)
 		vehicle_body.rotation.z = calculated_lean
-		vehicle_body.position = vehicle_body.position.lerp(Vector3(0, 0.2, 0), delta * 5)
+		vehicle_body.position = vehicle_body.position.lerp(vehicle_body_default_pos, delta * 5)
 
 	# Motorcycle corner leaning
 	if motorcycle_mesh != null:
@@ -338,13 +383,16 @@ func effect_engine(delta):
 
 func effect_trails():
 	var drift_intensity = abs(linear_speed - acceleration) + (abs(calculated_lean) * 2.0)
-	var should_emit = drift_intensity > 0.25
+	var is_braking = input.z < 0 and linear_speed > 0.1
+	var should_emit = (drift_intensity > 0.22 or is_braking) and colliding
 
 	if trail_left != null: trail_left.emitting = should_emit
 	if trail_right != null: trail_right.emitting = should_emit
+	if skid_left != null: skid_left.emitting = should_emit
+	if skid_right != null: skid_right.emitting = should_emit
 
 	var target_volume = -80.0
-	if should_emit: target_volume = remap(clamp(drift_intensity, 0.25, 2.0), 0.25, 2.0, -10.0, 0.0)
+	if should_emit: target_volume = remap(clamp(drift_intensity, 0.22, 2.0), 0.22, 2.0, -10.0, 0.0)
 
 	screech_sound.pitch_scale = lerp(screech_sound.pitch_scale, clamp(abs(linear_speed), 1.0, 3.0), 0.1)
 	screech_sound.volume_db = lerp(screech_sound.volume_db, target_volume, 10.0 * get_physics_process_delta_time())
