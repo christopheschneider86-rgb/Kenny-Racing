@@ -20,8 +20,7 @@ particles_anim_h_frames = 1
 particles_anim_v_frames = 1
 particles_anim_loop = false
 grow_amount = 0.5
-proximity_fade_enabled = true
-proximity_fade_distance = 0.25
+render_priority = 4
 
 [sub_resource type="Curve" id="Curve_t02a3"]
 _data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.503968, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
@@ -40,8 +39,8 @@ curve = SubResource("Curve_bncg7")
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_skid"]
 transparency = 1
 shading_mode = 0
-albedo_color = Color(0.12, 0.12, 0.14, 0.7)
-render_priority = 2
+albedo_color = Color(0.12, 0.12, 0.14, 0.75)
+render_priority = 3
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_skid"]
 size = Vector2(0.25, 0.35)
@@ -100,7 +99,7 @@ scale_amount_curve = SubResource("Curve_bncg7")
 color = Color(0.75, 0.76, 0.8, 0.7)
 
 [node name="SkidLeft" type="CPUParticles3D" parent="Container" unique_id=1450774766]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 0.02, -0.55)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 0.045, -0.55)
 material_override = SubResource("StandardMaterial3D_skid")
 cast_shadow = 0
 emitting = false
@@ -111,7 +110,7 @@ gravity = Vector3(0, 0, 0)
 local_coords = false
 
 [node name="SkidRight" type="CPUParticles3D" parent="Container" unique_id=1471178057]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 0.02, -0.55)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 0.045, -0.55)
 material_override = SubResource("StandardMaterial3D_skid")
 cast_shadow = 0
 emitting = false

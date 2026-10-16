@@ -2,16 +2,17 @@ class_name RaceManager extends Node
 
 # Race Manager for Kenny Racing:
 # - Track waypoint and segment math
-# - Lap progression (strictly 4 laps with sequential checkpoint anti-cheat)
-# - Real-time Wrong Way detection
+# - Forward-only Lap progression with halfway checkpoint anti-cheat
+# - Best lap timing and lap history
+# - Real-time Wrong Way detection (aligned with Kenney +Z car front)
 # - Respawn / Reset handler
 # - Integration bridge for learning apps (postMessage / reward signal)
 
 signal race_state_changed(state: int)
 signal countdown_tick(text: String)
-signal lap_updated(current_lap: int, total_laps: int)
+signal lap_updated(current_lap: int, total_laps: int, best_lap_time: float)
 signal wrong_way_toggled(is_wrong: bool)
-signal race_finished(total_time: float)
+signal race_finished(total_time: float, best_lap: float)
 signal race_reward_completed(data: Dictionary)
 
 enum GameState { MENU = 0, COUNTDOWN = 1, RACING = 2, FINISHED = 3 }
@@ -24,13 +25,21 @@ enum GameState { MENU = 0, COUNTDOWN = 1, RACING = 2, FINISHED = 3 }
 var current_state: GameState = GameState.MENU
 var current_lap: int = 1
 var race_time: float = 0.0
+var lap_start_time: float = 0.0
+var best_lap_time: float = 0.0
+var lap_times: Array[float] = []
+
+var start_pos: Vector3 = Vector3(3.75, 0.0, 3.75)
+var start_fwd: Vector3 = Vector3(0.0, 0.0, 1.0)
+var halfway_checkpoint_pos: Vector3 = Vector3(-11.25, 0.0, -11.25)
+var passed_halfway: bool = false
+var prev_dist_to_finish_plane: float = 0.0
 
 var current_segment: int = 0
-var checkpoint_progress: int = 0
 var is_wrong_way: bool = false
 var wrong_way_timer: float = 0.0
 
-# 16 connected track cells that form the circuit
+# 16 connected track cells that form the default circuit
 const TRACK_CELLS: Array[Vector2i] = [
 	Vector2i( 0,  0), # 0: Start / Finish Line
 	Vector2i( 0,  1), # 1: Straight
@@ -58,10 +67,25 @@ func _ready() -> void:
 		vehicle.input_disabled = true
 		_place_vehicle_at_start()
 
+func _find_start_tile() -> void:
+	start_pos = Vector3(3.75, 0.0, 3.75)
+	start_fwd = Vector3(0.0, 0.0, 1.0)
+
+	if grid_map:
+		for cell in grid_map.get_used_cells():
+			if grid_map.get_cell_item(cell) == 4: # track-finish
+				var loc = grid_map.map_to_local(cell)
+				start_pos = grid_map.to_global(loc)
+				start_pos.y = 0.0
+				var orient = grid_map.get_cell_item_orientation(cell)
+				start_fwd = _get_forward_from_orientation(orient)
+				break
+
 func _build_waypoints() -> void:
 	track_waypoints.clear()
-	var step := 7.4925
+	_find_start_tile()
 
+	var step := 7.4925
 	for cell in TRACK_CELLS:
 		if grid_map:
 			var local_center = grid_map.map_to_local(Vector3i(cell.x, 0, cell.y))
@@ -71,23 +95,22 @@ func _build_waypoints() -> void:
 			var wz = (float(cell.y) + 0.5) * step
 			track_waypoints.append(Vector3(wx, 0.0, wz))
 
+	# Find the halfway point farthest from start_pos
+	var max_dist := 0.0
+	var best_halfway = start_pos
+	for wp in track_waypoints:
+		var d = (wp - start_pos).length()
+		if d > max_dist:
+			max_dist = d
+			best_halfway = wp
+	halfway_checkpoint_pos = best_halfway
+
 func _place_vehicle_at_start() -> void:
 	if not vehicle:
 		return
-	var start_pos = Vector3(3.75, 0.0, 3.75)
-	var forward = Vector3(0.0, 0.0, 1.0)
-
-	if grid_map:
-		for cell in grid_map.get_used_cells():
-			if grid_map.get_cell_item(cell) == 4: # track-finish
-				var loc = grid_map.map_to_local(cell)
-				start_pos = grid_map.to_global(loc)
-				start_pos.y = 0.0
-				var orient = grid_map.get_cell_item_orientation(cell)
-				forward = _get_forward_from_orientation(orient)
-				break
-
-	vehicle.respawn_to(start_pos, forward)
+	_find_start_tile()
+	vehicle.respawn_to(start_pos, start_fwd)
+	prev_dist_to_finish_plane = 0.0
 
 func _get_forward_from_orientation(orient: int) -> Vector3:
 	match orient:
@@ -110,18 +133,22 @@ func start_race_countdown() -> void:
 	current_state = GameState.COUNTDOWN
 	race_state_changed.emit(current_state)
 
+	_build_waypoints()
 	_place_vehicle_at_start()
 	if vehicle:
 		vehicle.input_disabled = true
 
 	current_lap = 1
 	race_time = 0.0
+	lap_start_time = 0.0
+	best_lap_time = 0.0
+	lap_times.clear()
+	passed_halfway = false
 	current_segment = 0
-	checkpoint_progress = 0
 	is_wrong_way = false
 	wrong_way_timer = 0.0
 	wrong_way_toggled.emit(false)
-	lap_updated.emit(current_lap, total_laps)
+	lap_updated.emit(current_lap, total_laps, best_lap_time)
 
 	_run_countdown_sequence()
 
@@ -144,13 +171,14 @@ func _run_countdown_sequence() -> void:
 		sound_effects.play_countdown_beep(false)
 	await get_tree().create_timer(0.85).timeout
 
-	# "LOS! 🏁"
-	countdown_tick.emit("LOS! 🏁")
+	# "LOS!"
+	countdown_tick.emit("LOS!")
 	if sound_effects:
 		sound_effects.play_countdown_beep(true)
 
 	current_state = GameState.RACING
 	race_state_changed.emit(current_state)
+	lap_start_time = race_time
 	if vehicle:
 		vehicle.input_disabled = false
 
@@ -202,56 +230,70 @@ func _update_track_progress(delta: float) -> void:
 
 	current_segment = best_seg
 
-	# Sequential Checkpoint Progress to prevent cutting or reversing
-	if current_segment >= 1 and current_segment <= 4:
-		if checkpoint_progress == 0:
-			checkpoint_progress = 1
-	elif current_segment >= 5 and current_segment <= 8:
-		if checkpoint_progress == 1:
-			checkpoint_progress = 2
-	elif current_segment >= 9 and current_segment <= 12:
-		if checkpoint_progress == 2:
-			checkpoint_progress = 3
-	elif current_segment >= 13 and current_segment <= 15:
-		if checkpoint_progress == 3:
-			checkpoint_progress = 4
-	elif current_segment == 0:
-		if checkpoint_progress == 4:
-			# Completed full circuit!
-			current_lap += 1
-			checkpoint_progress = 0
+	# 1. HALFWAY CHECKPOINT DETECTION
+	# Vehicle must reach halfway through the track before a lap can be registered
+	var dist_to_halfway = Vector2(car_pos.x - halfway_checkpoint_pos.x, car_pos.z - halfway_checkpoint_pos.z).length()
+	var seg_halfway = (current_segment >= n / 3 and current_segment <= (2 * n) / 3)
+	if dist_to_halfway < 10.0 or seg_halfway:
+		passed_halfway = true
 
-			if current_lap > total_laps:
-				_finish_race()
-				return
-			else:
-				lap_updated.emit(current_lap, total_laps)
-				if sound_effects:
-					sound_effects.play_lap_chime()
+	# 2. FORWARD-ONLY LAP COMPLETION AT FINISH LINE
+	var to_car = car_pos - start_pos
+	to_car.y = 0.0
+	var dist_along_fwd = to_car.dot(start_fwd)
+	var lat_vec = to_car - start_fwd * dist_along_fwd
+	var lat_dist = lat_vec.length()
 
-	# Wrong Way Detection
+	# Kenney vehicle model front is at local +Z
+	var car_fwd = vehicle.vehicle_model.global_basis.z
+	car_fwd.y = 0.0
+	car_fwd = car_fwd.normalized()
+
+	var is_facing_fwd = car_fwd.dot(start_fwd) > 0.15
+	var vel_2d = Vector3(vehicle.linear_velocity.x, 0.0, vehicle.linear_velocity.z)
+	var is_moving_fwd = vel_2d.dot(start_fwd) > -0.2
+
+	# Legitimate lap completion criteria:
+	# - Has reached halfway checkpoint (cannot drive back & forth across start line)
+	# - Crossing within the width of the finish line road tile (lat_dist < 6.5)
+	# - Facing and moving forward across the finish line plane
+	if passed_halfway and lat_dist < 6.5 and is_facing_fwd and is_moving_fwd:
+		if prev_dist_to_finish_plane <= 0.8 and dist_along_fwd > 0.0 and dist_along_fwd < 4.5:
+			var lap_duration = race_time - lap_start_time
+			if lap_duration > 4.0: # Minimum lap duration sanity filter
+				lap_times.append(lap_duration)
+				if best_lap_time <= 0.0 or lap_duration < best_lap_time:
+					best_lap_time = lap_duration
+
+				lap_start_time = race_time
+				passed_halfway = false
+				current_lap += 1
+
+				if current_lap > total_laps:
+					_finish_race()
+					return
+				else:
+					lap_updated.emit(current_lap, total_laps, best_lap_time)
+					if sound_effects:
+						sound_effects.play_lap_chime()
+
+	prev_dist_to_finish_plane = dist_along_fwd
+
+	# 3. WRONG WAY DETECTION
 	var p0 = track_waypoints[current_segment]
 	var p1 = track_waypoints[(current_segment + 1) % n]
 	var seg_dir = Vector3(p1.x - p0.x, 0.0, p1.z - p0.z).normalized()
 
-	# Forward direction in Godot is -basis.z
-	var car_fwd = -vehicle.vehicle_model.global_basis.z
-	car_fwd.y = 0.0
-	car_fwd = car_fwd.normalized()
-
 	var dot = car_fwd.dot(seg_dir)
 
-	# If moving with significant velocity, combine facing direction and movement
-	var vel = vehicle.linear_velocity
-	var vel_2d = Vector3(vel.x, 0.0, vel.z)
-	if vel_2d.length() > 1.5:
+	if vel_2d.length() > 1.2:
 		var move_dot = vel_2d.normalized().dot(seg_dir)
 		dot = (dot + move_dot) * 0.5
 
-	# Only alert if facing opposite to track direction for more than 0.6s
-	if dot < -0.3:
+	# Only alert if facing/moving opposite to track direction for > 0.65s
+	if dot < -0.35:
 		wrong_way_timer += delta
-		if wrong_way_timer > 0.6:
+		if wrong_way_timer > 0.65:
 			if not is_wrong_way:
 				is_wrong_way = true
 				wrong_way_toggled.emit(true)
@@ -289,12 +331,14 @@ func _finish_race() -> void:
 	is_wrong_way = false
 	wrong_way_toggled.emit(false)
 
-	race_finished.emit(race_time)
+	race_finished.emit(race_time, best_lap_time)
 
 	var payload = {
 		"laps": total_laps,
 		"time": race_time,
 		"time_formatted": format_time(race_time),
+		"best_lap": best_lap_time,
+		"best_lap_formatted": format_time(best_lap_time) if best_lap_time > 0.0 else "--:--.--",
 		"success": true
 	}
 	race_reward_completed.emit(payload)
@@ -310,10 +354,11 @@ func _finish_race() -> void:
 					type: 'KENNY_RACING_COMPLETED',
 					laps: %d,
 					time: %f,
+					best_lap: %f,
 					success: true
 				}, '*');
 			}
-		""" % [total_laps, race_time])
+		""" % [total_laps, race_time, best_lap_time])
 
 func format_time(seconds: float) -> String:
 	var total_secs := int(seconds)

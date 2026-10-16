@@ -41,6 +41,48 @@ var vehicle_body_default_pos: Vector3 = Vector3(0, 0.4, 0)
 
 @export var control_mode: ControlMode = ControlMode.DIRECT_DIRECTION
 
+const VEHICLE_SPECS: Dictionary = {
+	"truck": {
+		"name": "Racing Truck",
+		"max_speed": 1.0,
+		"accel_rate": 5.5,
+		"brake_rate": 8.5,
+		"steer_speed": 3.8,
+		"min_grip": 0.55,
+		"drift_mult": 1.0,
+		"sphere_force": 95.0,
+		"mass": 1300.0,
+		"engine_pitch_base": 0.45,
+	},
+	"racecar": {
+		"name": "Rennauto",
+		"max_speed": 1.30,
+		"accel_rate": 7.5,
+		"brake_rate": 10.5,
+		"steer_speed": 5.0,
+		"min_grip": 0.45,
+		"drift_mult": 1.3,
+		"sphere_force": 125.0,
+		"mass": 750.0,
+		"engine_pitch_base": 0.60,
+	},
+	"motorcycle": {
+		"name": "Motorrad",
+		"max_speed": 1.20,
+		"accel_rate": 9.0,
+		"brake_rate": 9.5,
+		"steer_speed": 5.5,
+		"min_grip": 0.50,
+		"drift_mult": 1.1,
+		"sphere_force": 115.0,
+		"mass": 450.0,
+		"engine_pitch_base": 0.75,
+	}
+}
+
+func get_spec() -> Dictionary:
+	return VEHICLE_SPECS.get(current_vehicle_type, VEHICLE_SPECS["truck"])
+
 var current_vehicle_type: String = "truck"
 var current_vehicle_color: String = "yellow"
 
@@ -64,6 +106,8 @@ var calculated_lean: float
 
 func _ready() -> void:
 	_init_wheel_references()
+	if sphere:
+		sphere.mass = get_spec()["mass"]
 
 func _init_wheel_references() -> void:
 	vehicle_body = find_child("body", true, false)
@@ -111,7 +155,10 @@ func respawn_to(target_pos: Vector3, forward_dir: Vector3) -> void:
 	if fwd.is_zero_approx():
 		fwd = Vector3(0, 0, 1)
 
-	var new_basis = Basis.looking_at(fwd, Vector3.UP)
+	# Kenney vehicles have front at local +Z. Align basis.z with forward direction:
+	var right = Vector3.UP.cross(fwd).normalized()
+	var up = fwd.cross(right).normalized()
+	var new_basis = Basis(right, up, fwd)
 	vehicle_model.global_transform = Transform3D(new_basis, target_pos)
 	raycast.global_position = sphere.global_position
 
@@ -179,6 +226,10 @@ func set_vehicle(type_name: String, color_name: String) -> void:
 	fork = new_model.find_child("fork", true, false)
 	motorcycle_mesh = new_model.find_child("motorcycle", true, false)
 
+	var spec = get_spec()
+	if sphere:
+		sphere.mass = spec["mass"]
+
 func _apply_racecar_paint(model_node: Node, color_key: String) -> void:
 	var color_map = {
 		"red": Color(0.92, 0.15, 0.15),
@@ -212,16 +263,17 @@ func set_truck_color(color_name: String) -> void:
 # Physics & Control Process
 
 func _physics_process(delta):
+	var spec = get_spec()
 
 	handle_input(delta)
 
 	var direction = sign(linear_speed)
 	if direction == 0: direction = sign(input.z) if abs(input.z) > 0.1 else 1
 
-	var min_grip = 0.7 if control_mode == ControlMode.DIRECT_DIRECTION else 0.2
+	var min_grip = spec["min_grip"] if control_mode == ControlMode.DIRECT_DIRECTION else 0.2
 	var steering_grip = clamp(abs(linear_speed), min_grip, 1.0)
 
-	var target_angular = -input.x * steering_grip * 4 * direction
+	var target_angular = -input.x * steering_grip * spec["steer_speed"] * direction
 	angular_speed = lerp(angular_speed, target_angular, delta * 4)
 
 	vehicle_model.rotate_y(angular_speed * delta)
@@ -243,15 +295,15 @@ func _physics_process(delta):
 
 	colliding = raycast.is_colliding()
 
-	var target_speed = input.z
+	var target_speed = input.z * spec["max_speed"]
 
 	if (target_speed < 0 and linear_speed > 0.01):
-		linear_speed = lerp(linear_speed, 0.0, delta * 8)
+		linear_speed = lerp(linear_speed, 0.0, delta * spec["brake_rate"])
 	else:
 		if (target_speed < 0):
-			linear_speed = lerp(linear_speed, target_speed / 2, delta * 2)
+			linear_speed = lerp(linear_speed, target_speed * 0.5, delta * 3.0)
 		else:
-			linear_speed = lerp(linear_speed, target_speed, delta * 6)
+			linear_speed = lerp(linear_speed, target_speed, delta * spec["accel_rate"])
 
 	acceleration = lerpf(acceleration, linear_speed + (abs(sphere.angular_velocity.length() * linear_speed) / 100), delta * 1)
 
@@ -297,7 +349,8 @@ func handle_input(delta):
 			input.x = 0.0
 			input.z = 0.0
 
-	sphere.angular_velocity += vehicle_model.get_global_transform().basis.x * (linear_speed * 100) * delta
+	var spec = get_spec()
+	sphere.angular_velocity += vehicle_model.get_global_transform().basis.x * (linear_speed * spec["sphere_force"]) * delta
 
 func apply_directional_steering(j_vec: Vector2, _delta: float) -> void:
 	var cam = get_viewport().get_camera_3d()
@@ -342,9 +395,10 @@ func effect_body(delta):
 		vehicle_body.rotation.z = calculated_lean
 		vehicle_body.position = vehicle_body.position.lerp(vehicle_body_default_pos, delta * 5)
 
-	# Motorcycle corner leaning
+	# Motorcycle corner leaning (dynamic deep lean into turns)
 	if motorcycle_mesh != null:
-		motorcycle_mesh.rotation.z = lerp_angle(motorcycle_mesh.rotation.z, input.x * linear_speed, delta * 3)
+		var target_lean = -input.x * clampf(abs(linear_speed), 0.25, 1.0) * 0.55
+		motorcycle_mesh.rotation.z = lerp_angle(motorcycle_mesh.rotation.z, target_lean, delta * 6.0)
 
 func effect_wheels(delta):
 	# Rotate 4 wheels (Truck & RaceCar)
@@ -367,13 +421,14 @@ func effect_wheels(delta):
 # Engine sounds
 
 func effect_engine(delta):
+	var spec = get_spec()
 	var speed_factor = clamp(abs(linear_speed), 0.0, 1.0)
 	var throttle_factor = clamp(abs(input.z), 0.0, 1.0)
 
 	var target_volume = remap(speed_factor + (throttle_factor * 0.5), 0.0, 1.5, -15.0, -5.0)
 	engine_sound.volume_db = lerp(engine_sound.volume_db, target_volume, delta * 5.0)
 
-	var base_pitch = 0.7 if current_vehicle_type == "motorcycle" else 0.5
+	var base_pitch: float = spec["engine_pitch_base"]
 	var target_pitch = remap(speed_factor, 0.0, 1.0, base_pitch, 3.2)
 	if throttle_factor > 0.1: target_pitch += 0.2
 
@@ -382,9 +437,12 @@ func effect_engine(delta):
 # Show trails (and play skid sound)
 
 func effect_trails():
-	var drift_intensity = abs(linear_speed - acceleration) + (abs(calculated_lean) * 2.0)
-	var is_braking = input.z < 0 and linear_speed > 0.1
-	var should_emit = (drift_intensity > 0.22 or is_braking) and colliding
+	var spec = get_spec()
+	var drift_intensity = abs(linear_speed - acceleration) * spec.get("drift_mult", 1.0) + (abs(calculated_lean) * 2.0)
+	var is_burnout = (input.z > 0.35 and abs(linear_speed) < 0.55)
+	var is_braking = (input.z < -0.1 and abs(linear_speed) > 0.05)
+	var is_drifting = (abs(input.x) > 0.25 and abs(linear_speed) > 0.2) or (drift_intensity > 0.18)
+	var should_emit = (is_burnout or is_braking or is_drifting) and colliding
 
 	if trail_left != null: trail_left.emitting = should_emit
 	if trail_right != null: trail_right.emitting = should_emit
@@ -392,7 +450,7 @@ func effect_trails():
 	if skid_right != null: skid_right.emitting = should_emit
 
 	var target_volume = -80.0
-	if should_emit: target_volume = remap(clamp(drift_intensity, 0.22, 2.0), 0.22, 2.0, -10.0, 0.0)
+	if should_emit: target_volume = remap(clamp(drift_intensity, 0.18, 2.0), 0.18, 2.0, -10.0, 0.0)
 
 	screech_sound.pitch_scale = lerp(screech_sound.pitch_scale, clamp(abs(linear_speed), 1.0, 3.0), 0.1)
 	screech_sound.volume_db = lerp(screech_sound.volume_db, target_volume, 10.0 * get_physics_process_delta_time())

@@ -20,14 +20,14 @@ var active_world_id: String = "forest"
 # Definition of the Worlds and their Building Kits (Bausätze)
 const WORLDS_INFO = {
 	"forest": {
-		"name": "🌲 Wald & Natur",
+		"name": "Wald & Natur",
 		"tagline": "Grüne Rundstrecke im Wald mit Campingzelten und Baumreihen",
 		"sun_color": Color(1.0, 0.98, 0.92),
 		"sun_energy": 0.85,
 		"ambient_color": Color(0.24, 0.28, 0.25),
 		"kits": [
 			{
-				"category": "🛣️ Straßen & Fahrbahn",
+				"category": "Straßen & Fahrbahn",
 				"description": "Klassischer Asphalt mit rot-weißen Randsteinen",
 				"items": [
 					{"id": "track-finish", "name": "Start- / Ziellinie mit Bogen", "size": "10 x 10 m", "path": "res://models/track-finish.glb"},
@@ -37,7 +37,7 @@ const WORLDS_INFO = {
 				]
 			},
 			{
-				"category": "🌲 Bäume & Vegetation",
+				"category": "Bäume & Vegetation",
 				"description": "Dichte Tannen, Laubbäume und Gras",
 				"items": [
 					{"id": "decoration-forest", "name": "Wald-Gruppe", "size": "10 x 10 m", "path": "res://models/decoration-forest.glb"},
@@ -47,7 +47,7 @@ const WORLDS_INFO = {
 				]
 			},
 			{
-				"category": "⛺ Camping & Zeltlager",
+				"category": "Camping & Zeltlager",
 				"description": "Zuschauer-Zelte und Campingerlebnis",
 				"items": [
 					{"id": "decoration-tents", "name": "Zeltplatz-Kachel", "size": "10 x 10 m", "path": "res://models/decoration-tents.glb"},
@@ -58,14 +58,14 @@ const WORLDS_INFO = {
 		]
 	},
 	"stadium": {
-		"name": "🏟️ Grand Prix Stadion",
+		"name": "Grand Prix Stadion",
 		"tagline": "Motorsport-Arena mit Tribünen, Boxengasse, Flutlicht und Anzeigetafeln",
 		"sun_color": Color(0.98, 0.98, 1.0),
 		"sun_energy": 0.85,
 		"ambient_color": Color(0.26, 0.28, 0.34),
 		"kits": [
 			{
-				"category": "🛣️ GP-Strecke & Boxengasse",
+				"category": "GP-Strecke & Boxengasse",
 				"description": "Professioneller Streckenteppich und Boxenausfahrt",
 				"items": [
 					{"id": "roadStartPositions", "name": "Startaufstellung-Grid", "size": "10 x 10 m", "path": "res://kenney_racing-kit/Models/GLTF format/roadStartPositions.glb"},
@@ -75,7 +75,7 @@ const WORLDS_INFO = {
 				]
 			},
 			{
-				"category": "🏟️ Tribünen & Boxen",
+				"category": "Tribünen & Boxen",
 				"description": "Zuschauer-Ränge und Team-Hauptquartiere",
 				"items": [
 					{"id": "grandStandCovered", "name": "Überdachte Haupttribüne", "size": "10 x 8 m", "path": "res://kenney_racing-kit/Models/GLTF format/grandStandCovered.glb"},
@@ -85,7 +85,7 @@ const WORLDS_INFO = {
 				]
 			},
 			{
-				"category": "💡 Flutlicht & Sponsoring",
+				"category": "Flutlicht & Sponsoring",
 				"description": "Stadion-Beleuchtung, Kameras und Werbebanden",
 				"items": [
 					{"id": "lightPostLarge", "name": "Großer Flutlichtmast", "size": "2 x 12 m", "path": "res://kenney_racing-kit/Models/GLTF format/lightPostLarge.glb"},
@@ -97,14 +97,14 @@ const WORLDS_INFO = {
 		]
 	},
 	"rally": {
-		"name": "🏜️ Wüsten-Rallye & Sand",
+		"name": "Wüsten-Rallye & Sand",
 		"tagline": "Staubige Rallyestrecke mit Sprungschanzen, Sandkurven und Reifenstapeln",
 		"sun_color": Color(1.0, 0.9, 0.75),
 		"sun_energy": 0.85,
 		"ambient_color": Color(0.28, 0.25, 0.22),
 		"kits": [
 			{
-				"category": "🛣️ Rallye-Track & Schanzen",
+				"category": "Rallye-Track & Schanzen",
 				"description": "Sprunghügel und staubige Sandpassagen",
 				"items": [
 					{"id": "roadCornerLargeSand", "name": "Sand-Auslaufkurve", "size": "10 x 10 m", "path": "res://kenney_racing-kit/Models/GLTF format/roadCornerLargeSand.glb"},
@@ -114,7 +114,7 @@ const WORLDS_INFO = {
 				]
 			},
 			{
-				"category": "🛡️ Barrieren & Zäune",
+				"category": "Barrieren & Zäune",
 				"description": "Streckenabsicherung und Aufprallschutz",
 				"items": [
 					{"id": "barrierRed", "name": "Rote Aufprall-Barriere", "size": "4 x 1 m", "path": "res://kenney_racing-kit/Models/GLTF format/barrierRed.glb"},
@@ -124,7 +124,7 @@ const WORLDS_INFO = {
 				]
 			},
 			{
-				"category": "🚩 Pylonen & Flaggen",
+				"category": "Pylonen & Flaggen",
 				"description": "Streckenmarkierungen und Rallye-Bannertürme",
 				"items": [
 					{"id": "pylon", "name": "Orangefarbene Pylone", "size": "1 x 1 m", "path": "res://kenney_racing-kit/Models/GLTF format/pylon.glb"},
