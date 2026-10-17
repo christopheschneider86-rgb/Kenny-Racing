@@ -7,8 +7,11 @@ extends Node3D
 
 enum ViewMode { FOLLOW_VEHICLE, BUILDER }
 var view_mode: ViewMode = ViewMode.FOLLOW_VEHICLE
-var builder_pos: Vector3 = Vector3(-7.5, 0.0, -7.5)
-var builder_zoom: float = 28.0
+var default_basis: Basis
+var builder_basis: Basis = Basis(Vector3(1, 0, 0), Vector3(0, 0, -1), Vector3(0, 1, 0))
+
+func _ready() -> void:
+	default_basis = self.transform.basis
 
 func set_builder_mode(active: bool) -> void:
 	if active:
@@ -19,19 +22,22 @@ func set_builder_mode(active: bool) -> void:
 func pan_builder(delta_offset: Vector3) -> void:
 	builder_pos += delta_offset
 	# Limit pan within reasonable boundary
-	builder_pos.x = clampf(builder_pos.x, -40.0, 30.0)
-	builder_pos.z = clampf(builder_pos.z, -40.0, 30.0)
+	builder_pos.x = clampf(builder_pos.x, -50.0, 50.0)
+	builder_pos.z = clampf(builder_pos.z, -50.0, 50.0)
 
 func zoom_builder(delta_zoom: float) -> void:
-	builder_zoom = clampf(builder_zoom + delta_zoom, 14.0, 48.0)
+	builder_zoom = clampf(builder_zoom + delta_zoom, 14.0, 55.0)
 
 # Functions
 
 func _physics_process(delta):
 	if view_mode == ViewMode.BUILDER:
 		self.position = self.position.lerp(builder_pos, delta * 6.0)
+		self.transform.basis = self.transform.basis.slerp(builder_basis, delta * 6.0).orthonormalized()
 		camera.position.z = lerp(camera.position.z, builder_zoom, delta * 5.0)
 		return
+
+	self.transform.basis = self.transform.basis.slerp(default_basis, delta * 4.0).orthonormalized()
 
 	if target == null:
 		return

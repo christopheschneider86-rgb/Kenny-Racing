@@ -52,12 +52,14 @@ jobs:
 
       - name: Import Assets
         run: |
-          godot --headless --editor --quit || true
+          godot --headless --editor --quit-after 100 || godot --headless --import || true
 
       - name: Web Export
         run: |
           mkdir -v -p build/web
           godot --headless --verbose --export-release "Web" build/web/index.html
+          # Inject cache-busting meta tags into index.html
+          sed -i 's/<head>/<head><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" \/><meta http-equiv="Pragma" content="no-cache" \/><meta http-equiv="Expires" content="0" \/>/' build/web/index.html
 
       - name: Upload GitHub Pages Artifact
         uses: actions/upload-pages-artifact@v3

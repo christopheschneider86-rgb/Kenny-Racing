@@ -205,10 +205,18 @@ func set_vehicle(type_name: String, color_name: String) -> void:
 	elif current_vehicle_type == "motorcycle":
 		glb_path = "res://models/vehicle-motorcycle.glb"
 
-	if not ResourceLoader.exists(glb_path):
-		return
+	var new_model: Node = null
 	var scene = load(glb_path)
-	if not scene:
+	if scene is PackedScene:
+		new_model = scene.instantiate()
+	elif FileAccess.file_exists(glb_path):
+		var gltf = GLTFDocument.new()
+		var state = GLTFState.new()
+		var err = gltf.append_from_file(glb_path, state)
+		if err == OK:
+			new_model = gltf.generate_scene(state)
+
+	if not new_model:
 		return
 
 	var old_model = $Container.get_node_or_null("Model")
@@ -216,7 +224,6 @@ func set_vehicle(type_name: String, color_name: String) -> void:
 		old_model.name = "OldModel"
 		old_model.queue_free()
 
-	var new_model = scene.instantiate()
 	new_model.name = "Model"
 	$Container.add_child(new_model)
 	new_model.position = Vector3.ZERO

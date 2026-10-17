@@ -172,13 +172,16 @@ func _ready() -> void:
 	init_slots()
 	apply_slot(0)
 
+const MAX_CUSTOM_TRACKS = 10
+const EDITABLE_ITEMS = [0, 1, 2, 3, 4, 5, 6]
+
 # ==============================================================================
 # 1. TRACK SLOTS MANAGEMENT
 # ==============================================================================
 
 func init_slots() -> void:
 	track_slots.clear()
-	# Slot 0 is always Original (locked against edits)
+	# Slot 0 is always Original (Standard) - protected against modifications
 	track_slots.append({
 		"id": "original",
 		"name": "Original (Standard)",
@@ -189,56 +192,110 @@ func init_slots() -> void:
 
 	var custom_data = _load_slots_from_disk()
 
-	for i in range(1, 4):
-		var default_theme = "stadium" if i == 2 else "forest"
-		var slot_obj = {
-			"id": "slot_%d" % i,
-			"name": "Eigene Strecke %d" % i,
-			"theme": default_theme,
-			"is_locked": false,
-			"cells": []
-		}
-
-		if custom_data.has(slot_obj["id"]):
-			var c = custom_data[slot_obj["id"]]
-			if c.has("theme"):
-				slot_obj["theme"] = c["theme"]
-			if c.has("cells") and c["cells"] is Array:
-				slot_obj["cells"] = c["cells"]
-
-		# If custom slot is empty, initialize with single finish tile at (0, 0)
-		if slot_obj["cells"].is_empty():
-			slot_obj["cells"] = [
-				{"x": 0, "z": 0, "item": 4, "orient": 0}
-			]
-
-		track_slots.append(slot_obj)
+	if custom_data is Array:
+		for item in custom_data:
+			if item is Dictionary and (track_slots.size() - 1) < MAX_CUSTOM_TRACKS:
+				var c_theme: String = item.get("theme", "forest")
+				var c_cells: Array = item.get("cells", [])
+				if c_cells.is_empty():
+					c_cells = [{"x": 0, "z": 0, "item": 4, "orient": 0}]
+				var s_num = track_slots.size()
+				var def_name = "Strecke #%d (%s)" % [s_num, "Wald" if c_theme == "forest" else "Stadion"]
+				track_slots.append({
+					"id": item.get("id", "track_%d" % s_num),
+					"name": item.get("name", def_name),
+					"theme": c_theme,
+					"is_locked": false,
+					"cells": c_cells
+				})
+	elif custom_data is Dictionary:
+		for key in custom_data:
+			if (track_slots.size() - 1) >= MAX_CUSTOM_TRACKS:
+				break
+			var c = custom_data[key]
+			var c_theme: String = c.get("theme", "forest")
+			var c_cells: Array = c.get("cells", [])
+			if c_cells.is_empty():
+				c_cells = [{"x": 0, "z": 0, "item": 4, "orient": 0}]
+			var s_num = track_slots.size()
+			var def_name = "Strecke #%d (%s)" % [s_num, "Wald" if c_theme == "forest" else "Stadion"]
+			track_slots.append({
+				"id": key,
+				"name": c.get("name", def_name),
+				"theme": c_theme,
+				"is_locked": false,
+				"cells": c_cells
+			})
 
 	track_slots_updated.emit()
 
-func _load_slots_from_disk() -> Dictionary:
+func _load_slots_from_disk() -> Variant:
 	if not FileAccess.file_exists(SLOTS_SAVE_PATH):
-		return {}
+		return []
 	var file = FileAccess.open(SLOTS_SAVE_PATH, FileAccess.READ)
 	if not file:
-		return {}
+		return []
 	var text = file.get_as_text()
 	var json = JSON.new()
-	if json.parse(text) == OK and json.data is Dictionary:
+	if json.parse(text) == OK:
 		return json.data
-	return {}
+	return []
 
 func save_slots_to_disk() -> void:
-	var out = {}
+	var out: Array = []
 	for i in range(1, track_slots.size()):
 		var s = track_slots[i]
-		out[s["id"]] = {
+		out.append({
+			"id": s["id"],
+			"name": s["name"],
 			"theme": s["theme"],
 			"cells": s["cells"]
-		}
+		})
 	var file = FileAccess.open(SLOTS_SAVE_PATH, FileAccess.WRITE)
 	if file:
 		file.store_string(JSON.stringify(out, "\t"))
+
+func get_custom_track_count() -> int:
+	return maxi(0, track_slots.size() - 1)
+
+func can_create_custom_track() -> bool:
+	return get_custom_track_count() < MAX_CUSTOM_TRACKS
+
+func create_custom_track(theme_id: String) -> int:
+	if not can_create_custom_track():
+		return -1
+	var num = track_slots.size()
+	var theme_label = "Wald" if theme_id == "forest" else "Stadion"
+	var new_track = {
+		"id": "track_%d_%d" % [int(Time.get_unix_time_from_system()), num],
+		"name": "Strecke #%d (%s)" % [num, theme_label],
+		"theme": theme_id,
+		"is_locked": false,
+		"cells": [
+			{"x": 0, "z": 0, "item": 4, "orient": 0}
+		]
+	}
+	track_slots.append(new_track)
+	save_slots_to_disk()
+	track_slots_updated.emit()
+	return track_slots.size() - 1
+
+func delete_custom_track(slot_idx: int) -> void:
+	if slot_idx <= 0 or slot_idx >= track_slots.size():
+		return
+	track_slots.remove_at(slot_idx)
+	save_slots_to_disk()
+	if active_slot_idx == slot_idx:
+		apply_original_track()
+	elif active_slot_idx > slot_idx:
+		active_slot_idx -= 1
+	track_slots_updated.emit()
+
+func apply_original_track() -> void:
+	# Reload untouched pristine Original circuit
+	track_slots[0]["cells"] = DEFAULT_ORIGINAL_CELLS.duplicate(true)
+	track_slots[0]["theme"] = "forest"
+	apply_slot(0)
 
 func apply_slot(slot_idx: int) -> void:
 	if slot_idx < 0 or slot_idx >= track_slots.size():
@@ -252,10 +309,8 @@ func apply_slot(slot_idx: int) -> void:
 
 	# Populate GridMap
 	if grid_map:
-		# Remove only road pieces from grid_map, or clear and rebuild
-		const ROAD_ITEMS = [3, 4, 5, 6]
 		for c in grid_map.get_used_cells():
-			if grid_map.get_cell_item(c) in ROAD_ITEMS:
+			if grid_map.get_cell_item(c) in EDITABLE_ITEMS:
 				grid_map.set_cell_item(c, -1)
 
 		for c in slot["cells"]:
@@ -267,15 +322,14 @@ func apply_slot(slot_idx: int) -> void:
 
 func save_current_grid_to_slot(slot_idx: int) -> void:
 	if slot_idx <= 0 or slot_idx >= track_slots.size():
-		return # Original is locked against saving!
+		return # Original is protected!
 	if not grid_map:
 		return
 
 	var cells_arr: Array = []
-	const ROAD_ITEMS = [3, 4, 5, 6]
 	for c in grid_map.get_used_cells():
 		var item = grid_map.get_cell_item(c)
-		if item in ROAD_ITEMS:
+		if item in EDITABLE_ITEMS:
 			var orient = grid_map.get_cell_item_orientation(c)
 			cells_arr.append({
 				"x": c.x,
@@ -303,21 +357,6 @@ func clear_slot(slot_idx: int) -> void:
 
 	track_slots_updated.emit()
 
-func toggle_slot_theme(slot_idx: int) -> String:
-	if slot_idx <= 0 or slot_idx >= track_slots.size():
-		return "forest" # Original is locked to forest
-
-	var cur = track_slots[slot_idx]["theme"]
-	var nxt = "stadium" if cur == "forest" else "forest"
-	track_slots[slot_idx]["theme"] = nxt
-	save_slots_to_disk()
-
-	if active_slot_idx == slot_idx:
-		set_world(nxt)
-
-	track_slots_updated.emit()
-	return nxt
-
 func export_slot_string(slot_idx: int) -> String:
 	if slot_idx < 0 or slot_idx >= track_slots.size():
 		slot_idx = 0
@@ -329,6 +368,39 @@ func export_slot_string(slot_idx: int) -> String:
 	}
 	return Marshalls.utf8_to_base64(JSON.stringify(payload))
 
+func import_as_new_track(code_str: String) -> int:
+	if not can_create_custom_track():
+		return -1
+
+	code_str = code_str.strip_edges()
+	var json_str = code_str
+
+	# Attempt Base64 decode first
+	var decoded = Marshalls.base64_to_utf8(code_str)
+	if decoded != "" and decoded.begins_with("{"):
+		json_str = decoded
+
+	var json = JSON.new()
+	if json.parse(json_str) != OK or not (json.data is Dictionary):
+		return -1
+
+	var data: Dictionary = json.data
+	if not data.has("cells") or not (data["cells"] is Array):
+		return -1
+
+	var theme_id = data.get("theme", "forest")
+	if not WORLDS_INFO.has(theme_id):
+		theme_id = "forest"
+
+	var new_idx = create_custom_track(theme_id)
+	if new_idx > 0:
+		track_slots[new_idx]["cells"] = data["cells"]
+		if data.has("name"):
+			track_slots[new_idx]["name"] = data["name"]
+		save_slots_to_disk()
+		track_slots_updated.emit()
+	return new_idx
+
 func import_slot_string(slot_idx: int, code_str: String) -> bool:
 	if slot_idx <= 0 or slot_idx >= track_slots.size():
 		return false # Original is locked
@@ -336,7 +408,6 @@ func import_slot_string(slot_idx: int, code_str: String) -> bool:
 	code_str = code_str.strip_edges()
 	var json_str = code_str
 
-	# Attempt Base64 decode first
 	var decoded = Marshalls.base64_to_utf8(code_str)
 	if decoded != "" and decoded.begins_with("{"):
 		json_str = decoded
@@ -350,9 +421,6 @@ func import_slot_string(slot_idx: int, code_str: String) -> bool:
 		return false
 
 	track_slots[slot_idx]["cells"] = data["cells"]
-	if data.has("theme") and WORLDS_INFO.has(data["theme"]):
-		track_slots[slot_idx]["theme"] = data["theme"]
-
 	save_slots_to_disk()
 
 	if active_slot_idx == slot_idx:

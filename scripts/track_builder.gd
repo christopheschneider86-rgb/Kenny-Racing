@@ -13,7 +13,7 @@ signal orientation_changed(angle_deg: int)
 signal world_theme_changed(world_id: String)
 signal builder_mode_toggled(is_active: bool)
 
-enum ToolType { ROAD, PROP, ERASE }
+enum ToolType { ROAD, PROP, ERASE, GROUND }
 
 @export var grid_map: GridMap
 @export var view_node: Node3D
@@ -27,6 +27,7 @@ var is_active: bool = false
 # Current selection
 var current_tool_type: ToolType = ToolType.ROAD
 var current_road_item: int = 6 # Default: Straight (item 6)
+var current_ground_item: int = 0 # Default: Waldboden / Wiese (item 0)
 var current_prop_path: String = ""
 var current_prop_name: String = ""
 
@@ -173,6 +174,15 @@ func select_road_item(item_id: int) -> void:
 	var road_name := "Straße (Auto-Tile)" if item_id == 6 else ("Spezial-Straße #%d" % item_id)
 	tool_changed.emit("road", item_id, road_name)
 
+func select_ground_item(item_id: int, item_title: String) -> void:
+	current_tool_type = ToolType.GROUND
+	current_ground_item = item_id
+	current_prop_path = ""
+	current_prop_name = ""
+	_update_cursor_color(Color(0.25, 0.85, 0.35, 0.35))
+	_update_ghost_preview()
+	tool_changed.emit("ground", item_id, item_title)
+
 func select_prop_item(prop_path: String, prop_title: String) -> void:
 	current_tool_type = ToolType.PROP
 	current_prop_path = prop_path
@@ -188,6 +198,12 @@ func select_erase_tool() -> void:
 	_update_cursor_color(Color(1.0, 0.2, 0.2, 0.45))
 	_update_ghost_preview()
 	tool_changed.emit("erase", -1, "Radiergummi (Löschen)")
+
+func select_road_tool(item_id: int) -> void:
+	select_road_item(item_id)
+
+func select_prop_tool(prop_path: String, prop_title: String) -> void:
+	select_prop_item(prop_path, prop_title)
 
 func rotate_piece() -> void:
 	current_rot_idx = (current_rot_idx + 1) % 4
@@ -443,11 +459,18 @@ func _apply_placement(cell: Vector2i) -> void:
 		if sound_effects and sound_effects.has_method("play_checkpoint_beep"):
 			sound_effects.play_checkpoint_beep()
 
+	elif current_tool_type == ToolType.GROUND:
+		_remove_prop_at(cell)
+		grid_map.set_cell_item(cell3, current_ground_item, ORIENTATIONS[current_rot_idx])
+		_resolve_cell_and_neighbors(cell)
+		if sound_effects and sound_effects.has_method("play_checkpoint_beep"):
+			sound_effects.play_checkpoint_beep()
+
 	elif current_tool_type == ToolType.PROP:
-		if current_prop_path != "" and ResourceLoader.exists(current_prop_path):
+		if current_prop_path != "":
 			_remove_prop_at(cell)
 			var scene = load(current_prop_path)
-			if scene:
+			if scene is PackedScene:
 				var prop_instance = scene.instantiate()
 				var loc = grid_map.map_to_local(cell3)
 				var gpos = grid_map.to_global(loc)
@@ -469,6 +492,8 @@ func _apply_placement(cell: Vector2i) -> void:
 		_resolve_cell_and_neighbors(cell)
 		if sound_effects and sound_effects.has_method("play_button_click"):
 			sound_effects.play_button_click()
+
+	_save_to_active_slot()
 
 func _remove_prop_at(cell: Vector2i) -> void:
 	if placed_props_map.has(cell):
@@ -505,10 +530,23 @@ func _update_ghost_preview() -> void:
 				mi.material_override = mat
 				ghost_preview.add_child(mi)
 
+	elif current_tool_type == ToolType.GROUND:
+		if grid_map and grid_map.mesh_library:
+			var mesh = grid_map.mesh_library.get_item_mesh(current_ground_item)
+			if mesh:
+				var mi = MeshInstance3D.new()
+				mi.mesh = mesh
+				mi.scale = Vector3(0.75, 0.75, 0.75)
+				var mat = StandardMaterial3D.new()
+				mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				mat.albedo_color = Color(0.3, 0.9, 0.4, 0.65)
+				mi.material_override = mat
+				ghost_preview.add_child(mi)
+
 	elif current_tool_type == ToolType.PROP:
-		if current_prop_path != "" and ResourceLoader.exists(current_prop_path):
+		if current_prop_path != "":
 			var sc = load(current_prop_path)
-			if sc:
+			if sc is PackedScene:
 				var inst = sc.instantiate()
 				inst.scale = Vector3(1.0, 1.0, 1.0)
 				ghost_preview.add_child(inst)
