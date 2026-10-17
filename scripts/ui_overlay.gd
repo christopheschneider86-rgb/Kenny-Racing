@@ -292,16 +292,9 @@ func _create_hud() -> void:
 	action_box.offset_right = -35
 	action_box.offset_bottom = -35
 	action_box.offset_left = -230
-	action_box.offset_top = -220
+	action_box.offset_top = -140
 	action_box.add_theme_constant_override("separation", 10)
 	hud_screen.add_child(action_box)
-
-	var hud_builder_btn = Button.new()
-	hud_builder_btn.text = "Streckenbauer"
-	hud_builder_btn.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(hud_builder_btn, Color(0.18, 0.45, 0.78, 0.9), Color(0.3, 0.65, 0.95), 14, "res://sprites/icons/tools.png")
-	hud_builder_btn.pressed.connect(_open_builder)
-	action_box.add_child(hud_builder_btn)
 
 	var respawn_btn = Button.new()
 	respawn_btn.text = "Auto zurücksetzen"
@@ -531,15 +524,6 @@ func _create_start_screen() -> void:
 	_apply_button_style(start_btn, Color(0.18, 0.72, 0.35), Color(0.35, 0.95, 0.55), 15, "res://sprites/icons/flag_checkers.png")
 	start_btn.pressed.connect(_on_start_button_pressed)
 	card_vbox.add_child(start_btn)
-
-	# Interactive Streckenbauer Button
-	var builder_btn = Button.new()
-	builder_btn.text = "Streckenbauer (Bauen)"
-	builder_btn.custom_minimum_size = Vector2(0, 42)
-	builder_btn.add_theme_font_size_override("font_size", 14)
-	_apply_button_style(builder_btn, Color(0.2, 0.45, 0.85), Color(0.4, 0.75, 1.0), 14, "res://sprites/icons/tools.png")
-	builder_btn.pressed.connect(_open_builder)
-	card_vbox.add_child(builder_btn)
 
 # ==============================================================================
 # 3. INTERACTIVE TRACK BUILDER UI
