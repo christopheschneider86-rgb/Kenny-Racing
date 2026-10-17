@@ -20,9 +20,20 @@ class_name UIOverlay extends CanvasLayer
 # Root Controls
 var root_control: Control
 var start_screen: Control
+var track_select_screen: Control
 var hud_screen: Control
 var victory_screen: Control
 var builder_screen: Control
+var import_export_dialog: Control
+
+# Streckenwahl & Dialog elements
+var track_select_cards_box: VBoxContainer
+var active_track_label: Label
+var dialog_text_edit: TextEdit
+var dialog_title: Label
+var dialog_action_btn: Button
+var current_dialog_slot: int = 1
+var is_import_mode: bool = false
 
 # HUD Elements
 var lap_label: Label
@@ -151,8 +162,10 @@ func _create_ui_hierarchy() -> void:
 
 	_create_hud()
 	_create_start_screen()
+	_create_track_select_screen()
 	_create_victory_screen()
 	_create_track_builder_ui()
+	_create_import_export_dialog()
 
 # ==============================================================================
 # 1. HUD CREATION
@@ -476,49 +489,44 @@ func _create_start_screen() -> void:
 
 	card_vbox.add_child(HSeparator.new())
 
-	# 3. WORLD
-	var world_header = Label.new()
-	world_header.text = "3. Rennwelt & Thema:"
-	world_header.add_theme_font_size_override("font_size", 14)
-	world_header.add_theme_color_override("font_color", Color(1.0, 0.95, 0.6))
-	card_vbox.add_child(world_header)
+	# 3. TRACK & WORLD SELECTION
+	var track_header = Label.new()
+	track_header.text = "3. Rennstrecke & Bausatz:"
+	track_header.add_theme_font_size_override("font_size", 14)
+	track_header.add_theme_color_override("font_color", Color(1.0, 0.95, 0.6))
+	card_vbox.add_child(track_header)
 
-	var world_hbox = HBoxContainer.new()
-	world_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	world_hbox.add_theme_constant_override("separation", 6)
-	card_vbox.add_child(world_hbox)
+	active_track_label = Label.new()
+	active_track_label.text = "Strecke: Original (Standard)"
+	active_track_label.add_theme_font_size_override("font_size", 13)
+	active_track_label.add_theme_color_override("font_color", Color(0.4, 0.9, 1.0))
+	card_vbox.add_child(active_track_label)
 
-	var worlds = [
-		{"id": "forest", "label": "Wald", "col": Color(0.2, 0.6, 0.3), "icon": "res://sprites/icons/tree.png"},
-		{"id": "stadium", "label": "Stadion", "col": Color(0.2, 0.5, 0.85), "icon": "res://sprites/icons/stadium.png"},
-		{"id": "rally", "label": "Rallye", "col": Color(0.85, 0.5, 0.15), "icon": "res://sprites/icons/rally.png"}
-	]
-
-	for w in worlds:
-		var w_btn = Button.new()
-		w_btn.text = w["label"]
-		w_btn.add_theme_font_size_override("font_size", 13)
-		_apply_button_style(w_btn, w["col"] * 0.8, w["col"], 12, w["icon"])
-		var wid: String = w["id"]
-		w_btn.pressed.connect(func(): _select_world(wid))
-		world_hbox.add_child(w_btn)
-		world_buttons[wid] = w_btn
-
-	_highlight_selected_world_button("forest")
+	var track_select_btn = Button.new()
+	track_select_btn.text = "Streckenauswahl & Slots"
+	track_select_btn.custom_minimum_size = Vector2(0, 42)
+	track_select_btn.add_theme_font_size_override("font_size", 14)
+	_apply_button_style(track_select_btn, Color(0.18, 0.45, 0.78), Color(0.35, 0.7, 1.0), 12, "res://sprites/icons/road_straight.png")
+	track_select_btn.pressed.connect(func():
+		_show_screen("track_select")
+	)
+	card_vbox.add_child(track_select_btn)
 
 	card_vbox.add_child(HSeparator.new())
 
 	# Control Mode Button
 	mode_start_button = Button.new()
 	mode_start_button.text = "Modus: Intuitiv"
+	mode_start_button.custom_minimum_size = Vector2(0, 38)
 	mode_start_button.add_theme_font_size_override("font_size", 13)
-	_apply_button_style(mode_start_button, Color(0.18, 0.45, 0.75), Color(0.3, 0.65, 0.95), 12, "res://sprites/icons/steering.png")
+	_apply_button_style(mode_start_button, Color(0.18, 0.35, 0.55), Color(0.3, 0.55, 0.85), 12, "res://sprites/icons/steering.png")
 	mode_start_button.pressed.connect(_on_toggle_control_mode)
 	card_vbox.add_child(mode_start_button)
 
 	# Big START Button
 	var start_btn = Button.new()
 	start_btn.text = "Rennen starten (4 Runden)"
+	start_btn.custom_minimum_size = Vector2(0, 48)
 	start_btn.add_theme_font_size_override("font_size", 16)
 	_apply_button_style(start_btn, Color(0.18, 0.72, 0.35), Color(0.35, 0.95, 0.55), 15, "res://sprites/icons/flag_checkers.png")
 	start_btn.pressed.connect(_on_start_button_pressed)
@@ -526,9 +534,10 @@ func _create_start_screen() -> void:
 
 	# Interactive Streckenbauer Button
 	var builder_btn = Button.new()
-	builder_btn.text = "Streckenbauer (Eigene Strecke)"
-	builder_btn.add_theme_font_size_override("font_size", 15)
-	_apply_button_style(builder_btn, Color(0.2, 0.45, 0.85), Color(0.4, 0.75, 1.0), 15, "res://sprites/icons/tools.png")
+	builder_btn.text = "Streckenbauer (Bauen)"
+	builder_btn.custom_minimum_size = Vector2(0, 42)
+	builder_btn.add_theme_font_size_override("font_size", 14)
+	_apply_button_style(builder_btn, Color(0.2, 0.45, 0.85), Color(0.4, 0.75, 1.0), 14, "res://sprites/icons/tools.png")
 	builder_btn.pressed.connect(_open_builder)
 	card_vbox.add_child(builder_btn)
 
@@ -546,18 +555,18 @@ func _create_track_builder_ui() -> void:
 
 	# Prominent Back Button (Top-Left)
 	var back_btn = Button.new()
-	back_btn.text = "Zurück zum Menü"
+	back_btn.text = "Zurück zur Streckenauswahl"
 	back_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	back_btn.offset_left = 18
 	back_btn.offset_top = 18
-	back_btn.offset_right = 210
+	back_btn.offset_right = 240
 	back_btn.offset_bottom = 66
-	back_btn.add_theme_font_size_override("font_size", 15)
+	back_btn.add_theme_font_size_override("font_size", 14)
 	_apply_button_style(back_btn, Color(0.18, 0.22, 0.35, 0.95), Color(0.45, 0.7, 1.0), 14, "res://sprites/icons/back.png")
 	back_btn.pressed.connect(func():
 		if track_builder:
 			track_builder.close_builder()
-		_show_screen("menu")
+		_show_screen("track_select")
 	)
 	builder_screen.add_child(back_btn)
 
@@ -1089,6 +1098,12 @@ func _show_screen(name_str: String) -> void:
 	victory_screen.visible = (name_str == "victory")
 	if builder_screen:
 		builder_screen.visible = (name_str == "builder")
+	if track_select_screen:
+		track_select_screen.visible = (name_str == "track_select")
+		if name_str == "track_select":
+			_refresh_track_select_screen()
+	if name_str == "menu":
+		_update_active_track_label()
 
 func _on_start_button_pressed() -> void:
 	if sound_effects:
@@ -1236,4 +1251,363 @@ func _apply_button_style(btn: Button, bg: Color, border: Color = Color.TRANSPARE
 		btn.icon = load(icon_path)
 		btn.expand_icon = true
 		btn.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.add_theme_constant_override("icon_max_width", 26)
 		btn.add_theme_constant_override("h_separation", 8)
+
+
+# ==============================================================================
+# 8. TRACK SELECTION & SLOTS UI
+# ==============================================================================
+
+func _create_track_select_screen() -> void:
+	track_select_screen = Control.new()
+	track_select_screen.name = "TrackSelectScreen"
+	track_select_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	track_select_screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	track_select_screen.visible = false
+	root_control.add_child(track_select_screen)
+
+	var main_panel = PanelContainer.new()
+	main_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	main_panel.offset_left = 24
+	main_panel.offset_top = 18
+	main_panel.offset_right = -24
+	main_panel.offset_bottom = -18
+	main_panel.add_theme_stylebox_override("panel", _create_panel_style(Color(0.06, 0.09, 0.16, 0.96), Color(0.35, 0.7, 1.0, 0.9), 24, 2))
+	track_select_screen.add_child(main_panel)
+
+	var main_vbox = VBoxContainer.new()
+	main_vbox.add_theme_constant_override("separation", 12)
+	main_panel.add_child(main_vbox)
+
+	var top_bar = HBoxContainer.new()
+	top_bar.add_theme_constant_override("separation", 16)
+	main_vbox.add_child(top_bar)
+
+	var back_to_menu_btn = Button.new()
+	back_to_menu_btn.text = "Zurück zum Menü"
+	back_to_menu_btn.custom_minimum_size = Vector2(180, 44)
+	back_to_menu_btn.add_theme_font_size_override("font_size", 14)
+	_apply_button_style(back_to_menu_btn, Color(0.2, 0.25, 0.4), Color(0.4, 0.6, 0.9), 14, "res://sprites/icons/back.png")
+	back_to_menu_btn.pressed.connect(func(): _show_screen("menu"))
+	top_bar.add_child(back_to_menu_btn)
+
+	var title_vbox = VBoxContainer.new()
+	title_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_bar.add_child(title_vbox)
+
+	var heading = Label.new()
+	heading.text = "STRECKENAUSWAHL & BAUSÄTZE"
+	heading.add_theme_font_size_override("font_size", 22)
+	heading.add_theme_color_override("font_color", Color(1.0, 0.92, 0.35))
+	title_vbox.add_child(heading)
+
+	var sub_heading = Label.new()
+	sub_heading.text = "Die Standard-Strecke ist das Original. In den 3 Slots kannst du eigene Rundkurse bauen, importieren und exportieren."
+	sub_heading.add_theme_font_size_override("font_size", 12)
+	sub_heading.add_theme_color_override("font_color", Color(0.75, 0.85, 1.0))
+	title_vbox.add_child(sub_heading)
+
+	main_vbox.add_child(HSeparator.new())
+
+	var scroll = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main_vbox.add_child(scroll)
+
+	track_select_cards_box = VBoxContainer.new()
+	track_select_cards_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	track_select_cards_box.add_theme_constant_override("separation", 10)
+	scroll.add_child(track_select_cards_box)
+
+func _refresh_track_select_screen() -> void:
+	if not track_select_cards_box or not track_manager:
+		return
+
+	for c in track_select_cards_box.get_children():
+		c.queue_free()
+
+	for slot_idx in range(track_manager.track_slots.size()):
+		var slot: Dictionary = track_manager.track_slots[slot_idx]
+		var is_active = (slot_idx == track_manager.active_slot_idx)
+
+		var card = PanelContainer.new()
+		var border_color = Color(0.3, 0.95, 0.6) if is_active else Color(0.25, 0.5, 0.8)
+		var bg_color = Color(0.08, 0.16, 0.25, 0.9) if is_active else Color(0.07, 0.1, 0.18, 0.9)
+		card.add_theme_stylebox_override("panel", _create_panel_style(bg_color, border_color, 16, 2 if is_active else 1))
+		track_select_cards_box.add_child(card)
+
+		var card_hbox = HBoxContainer.new()
+		card_hbox.add_theme_constant_override("separation", 14)
+		card.add_child(card_hbox)
+
+		var icon_path = "res://sprites/icons/tree.png" if slot["theme"] == "forest" else "res://sprites/icons/stadium.png"
+		if slot["is_locked"]:
+			icon_path = "res://sprites/icons/road_straight.png"
+		var icon_rect = _create_icon_rect(icon_path, Vector2(48, 48))
+		card_hbox.add_child(icon_rect)
+
+		var info_vbox = VBoxContainer.new()
+		info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info_vbox.add_theme_constant_override("separation", 3)
+		card_hbox.add_child(info_vbox)
+
+		var name_row = HBoxContainer.new()
+		name_row.add_theme_constant_override("separation", 8)
+		info_vbox.add_child(name_row)
+
+		var slot_title = Label.new()
+		slot_title.text = slot["name"]
+		slot_title.add_theme_font_size_override("font_size", 16)
+		slot_title.add_theme_color_override("font_color", Color.WHITE)
+		name_row.add_child(slot_title)
+
+		if slot["is_locked"]:
+			var lock_badge = Label.new()
+			lock_badge.text = "[ STANDARD - UNVERÄNDERBAR ]"
+			lock_badge.add_theme_font_size_override("font_size", 11)
+			lock_badge.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
+			name_row.add_child(lock_badge)
+		else:
+			var slot_badge = Label.new()
+			slot_badge.text = "[ SPEICHER-SLOT #%d ]" % slot_idx
+			slot_badge.add_theme_font_size_override("font_size", 11)
+			slot_badge.add_theme_color_override("font_color", Color(0.4, 0.85, 1.0))
+			name_row.add_child(slot_badge)
+
+		if is_active:
+			var active_badge = Label.new()
+			active_badge.text = "✓ AKTIV"
+			active_badge.add_theme_font_size_override("font_size", 11)
+			active_badge.add_theme_color_override("font_color", Color(0.4, 1.0, 0.6))
+			name_row.add_child(active_badge)
+
+		var desc_lbl = Label.new()
+		var theme_name = "Wald & Natur (Standard)" if slot["theme"] == "forest" else "Grand Prix Stadion (Racing)"
+		var cell_count = slot["cells"].size()
+		desc_lbl.text = "Thema: %s   •   %d Kacheln" % [theme_name, cell_count]
+		desc_lbl.add_theme_font_size_override("font_size", 12)
+		desc_lbl.add_theme_color_override("font_color", Color(0.7, 0.8, 0.95))
+		info_vbox.add_child(desc_lbl)
+
+		var btns_hbox = HBoxContainer.new()
+		btns_hbox.add_theme_constant_override("separation", 6)
+		card_hbox.add_child(btns_hbox)
+
+		var s_idx := slot_idx
+
+		if slot["is_locked"]:
+			var race_btn = Button.new()
+			race_btn.text = "Rennen Starten"
+			race_btn.custom_minimum_size = Vector2(170, 38)
+			race_btn.add_theme_font_size_override("font_size", 13)
+			_apply_button_style(race_btn, Color(0.18, 0.72, 0.35), Color(0.35, 0.95, 0.55), 12, "res://sprites/icons/flag_checkers.png")
+			race_btn.pressed.connect(func(): _start_race_on_slot(0))
+			btns_hbox.add_child(race_btn)
+		else:
+			var theme_btn = Button.new()
+			theme_btn.text = "Thema: " + ("Wald" if slot["theme"] == "forest" else "Racing")
+			theme_btn.custom_minimum_size = Vector2(130, 38)
+			theme_btn.add_theme_font_size_override("font_size", 12)
+			var th_col = Color(0.2, 0.6, 0.3) if slot["theme"] == "forest" else Color(0.2, 0.5, 0.85)
+			_apply_button_style(theme_btn, th_col * 0.8, th_col, 10, "res://sprites/icons/tree.png" if slot["theme"] == "forest" else "res://sprites/icons/stadium.png")
+			theme_btn.pressed.connect(func(): _toggle_slot_theme(s_idx))
+			btns_hbox.add_child(theme_btn)
+
+			var play_btn = Button.new()
+			play_btn.text = "Fahren"
+			play_btn.custom_minimum_size = Vector2(95, 38)
+			play_btn.add_theme_font_size_override("font_size", 13)
+			_apply_button_style(play_btn, Color(0.18, 0.72, 0.35), Color(0.35, 0.95, 0.55), 10, "res://sprites/icons/flag_checkers.png")
+			play_btn.pressed.connect(func(): _start_race_on_slot(s_idx))
+			btns_hbox.add_child(play_btn)
+
+			var build_btn = Button.new()
+			build_btn.text = "Bauen"
+			build_btn.custom_minimum_size = Vector2(90, 38)
+			build_btn.add_theme_font_size_override("font_size", 13)
+			_apply_button_style(build_btn, Color(0.2, 0.45, 0.85), Color(0.4, 0.75, 1.0), 10, "res://sprites/icons/edit.png")
+			build_btn.pressed.connect(func(): _open_builder_for_slot(s_idx))
+			btns_hbox.add_child(build_btn)
+
+			var del_btn = Button.new()
+			del_btn.text = "Löschen"
+			del_btn.custom_minimum_size = Vector2(85, 38)
+			del_btn.add_theme_font_size_override("font_size", 12)
+			_apply_button_style(del_btn, Color(0.55, 0.2, 0.2), Color(0.85, 0.3, 0.3), 10, "res://sprites/icons/trash.png")
+			del_btn.pressed.connect(func(): _clear_slot(s_idx))
+			btns_hbox.add_child(del_btn)
+
+			var exp_btn = Button.new()
+			exp_btn.text = "Export"
+			exp_btn.custom_minimum_size = Vector2(85, 38)
+			exp_btn.add_theme_font_size_override("font_size", 12)
+			_apply_button_style(exp_btn, Color(0.25, 0.35, 0.5), Color(0.45, 0.65, 0.9), 10, "res://sprites/icons/export.png")
+			exp_btn.pressed.connect(func(): _export_slot(s_idx))
+			btns_hbox.add_child(exp_btn)
+
+			var imp_btn = Button.new()
+			imp_btn.text = "Import"
+			imp_btn.custom_minimum_size = Vector2(85, 38)
+			imp_btn.add_theme_font_size_override("font_size", 12)
+			_apply_button_style(imp_btn, Color(0.25, 0.35, 0.5), Color(0.45, 0.65, 0.9), 10, "res://sprites/icons/import.png")
+			imp_btn.pressed.connect(func(): _import_slot(s_idx))
+			btns_hbox.add_child(imp_btn)
+
+func _create_import_export_dialog() -> void:
+	import_export_dialog = Control.new()
+	import_export_dialog.name = "ImportExportDialog"
+	import_export_dialog.set_anchors_preset(Control.PRESET_FULL_RECT)
+	import_export_dialog.visible = false
+	root_control.add_child(import_export_dialog)
+
+	var dim = ColorRect.new()
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0, 0, 0, 0.7)
+	import_export_dialog.add_child(dim)
+
+	var card = PanelContainer.new()
+	card.set_anchors_preset(Control.PRESET_CENTER)
+	card.offset_left = -260
+	card.offset_top = -180
+	card.offset_right = 260
+	card.offset_bottom = 180
+	card.add_theme_stylebox_override("panel", _create_panel_style(Color(0.08, 0.12, 0.22, 0.98), Color(0.4, 0.75, 1.0), 22, 2))
+	import_export_dialog.add_child(card)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	card.add_child(vbox)
+
+	dialog_title = Label.new()
+	dialog_title.text = "Strecke Exportieren"
+	dialog_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dialog_title.add_theme_font_size_override("font_size", 18)
+	dialog_title.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
+	vbox.add_child(dialog_title)
+
+	var hint = Label.new()
+	hint.text = "Kopiere diesen Streckencode oder füge einen Code ein:"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_font_size_override("font_size", 12)
+	hint.add_theme_color_override("font_color", Color(0.8, 0.9, 1.0))
+	vbox.add_child(hint)
+
+	dialog_text_edit = TextEdit.new()
+	dialog_text_edit.custom_minimum_size = Vector2(480, 160)
+	dialog_text_edit.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	dialog_text_edit.add_theme_font_size_override("font_size", 12)
+	vbox.add_child(dialog_text_edit)
+
+	var btns_row = HBoxContainer.new()
+	btns_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	btns_row.add_theme_constant_override("separation", 12)
+	vbox.add_child(btns_row)
+
+	dialog_action_btn = Button.new()
+	dialog_action_btn.text = "Kopieren"
+	dialog_action_btn.custom_minimum_size = Vector2(180, 40)
+	dialog_action_btn.add_theme_font_size_override("font_size", 14)
+	_apply_button_style(dialog_action_btn, Color(0.18, 0.72, 0.35), Color(0.35, 0.95, 0.55), 12, "res://sprites/icons/export.png")
+	dialog_action_btn.pressed.connect(_on_dialog_action_pressed)
+	btns_row.add_child(dialog_action_btn)
+
+	var close_btn = Button.new()
+	close_btn.text = "Schließen"
+	close_btn.custom_minimum_size = Vector2(130, 40)
+	close_btn.add_theme_font_size_override("font_size", 14)
+	_apply_button_style(close_btn, Color(0.3, 0.35, 0.45), Color(0.5, 0.6, 0.75), 12)
+	close_btn.pressed.connect(func(): import_export_dialog.visible = false)
+	btns_row.add_child(close_btn)
+
+func _show_export_dialog(slot_idx: int, code: String) -> void:
+	current_dialog_slot = slot_idx
+	is_import_mode = false
+	dialog_title.text = "Strecke Exportieren (Slot %d)" % slot_idx
+	dialog_text_edit.text = code
+	dialog_text_edit.editable = false
+	dialog_action_btn.text = "In Zwischenablage kopieren"
+	import_export_dialog.visible = true
+
+func _show_import_dialog(slot_idx: int) -> void:
+	current_dialog_slot = slot_idx
+	is_import_mode = true
+	dialog_title.text = "Strecke Importieren (Slot %d)" % slot_idx
+	dialog_text_edit.text = ""
+	dialog_text_edit.editable = true
+	dialog_text_edit.placeholder_text = "Füge hier deinen Streckencode ein..."
+	dialog_action_btn.text = "Strecke Laden"
+	import_export_dialog.visible = true
+
+func _on_dialog_action_pressed() -> void:
+	if is_import_mode:
+		var code = dialog_text_edit.text.strip_edges()
+		if code == "":
+			_show_temporary_banner("Bitte Code eingeben!", 2.0)
+			return
+		if track_manager:
+			var ok = track_manager.import_slot_string(current_dialog_slot, code)
+			if ok:
+				_show_temporary_banner("Strecke erfolgreich importiert!", 2.0)
+				import_export_dialog.visible = false
+				_refresh_track_select_screen()
+			else:
+				_show_temporary_banner("Ungültiger Streckencode!", 2.0)
+	else:
+		DisplayServer.clipboard_set(dialog_text_edit.text)
+		_show_temporary_banner("Code in die Zwischenablage kopiert!", 2.0)
+
+func _start_race_on_slot(slot_idx: int) -> void:
+	if sound_effects:
+		sound_effects.play_click()
+	if track_manager:
+		track_manager.apply_slot(slot_idx)
+	_update_active_track_label()
+	_show_screen("hud")
+	if race_manager:
+		race_manager.start_race_countdown()
+
+func _open_builder_for_slot(slot_idx: int) -> void:
+	if sound_effects:
+		sound_effects.play_click()
+	if track_manager:
+		track_manager.apply_slot(slot_idx)
+	_update_active_track_label()
+	_open_builder()
+
+func _toggle_slot_theme(slot_idx: int) -> void:
+	if sound_effects:
+		sound_effects.play_click()
+	if track_manager:
+		var nxt = track_manager.toggle_slot_theme(slot_idx)
+		_show_temporary_banner("Thema geändert zu: " + ("Wald (Standard)" if nxt == "forest" else "Stadion (Racing)"), 2.0)
+	_refresh_track_select_screen()
+	_update_active_track_label()
+
+func _clear_slot(slot_idx: int) -> void:
+	if sound_effects:
+		sound_effects.play_click()
+	if track_manager:
+		track_manager.clear_slot(slot_idx)
+		_show_temporary_banner("Slot %d geleert!" % slot_idx, 2.0)
+	_refresh_track_select_screen()
+
+func _export_slot(slot_idx: int) -> void:
+	if sound_effects:
+		sound_effects.play_click()
+	if not track_manager:
+		return
+	var code = track_manager.export_slot_string(slot_idx)
+	DisplayServer.clipboard_set(code)
+	_show_export_dialog(slot_idx, code)
+	_show_temporary_banner("Streckencode kopiert!", 2.0)
+
+func _import_slot(slot_idx: int) -> void:
+	if sound_effects:
+		sound_effects.play_click()
+	_show_import_dialog(slot_idx)
+
+func _update_active_track_label() -> void:
+	if active_track_label and track_manager:
+		var slot = track_manager.get_active_slot_data()
+		active_track_label.text = "Strecke: " + slot["name"]

@@ -99,14 +99,19 @@ func _end_strip() -> void:
 	current_mesh_instance = null
 	current_points.clear()
 
+@export var strip_lifetime: float = 18.0
+
 func _process(delta: float) -> void:
 	var to_remove: Array = []
 	for s in active_strips:
 		s["age"] += delta
-		var alpha = clampf(1.0 - (s["age"] / 4.0), 0.0, 1.0)
+		var progress = s["age"] / strip_lifetime
+		var alpha = 1.0
+		if progress > 0.6:
+			alpha = clampf((1.0 - progress) / 0.4, 0.0, 1.0)
 		if s["mat"] is StandardMaterial3D:
-			s["mat"].albedo_color.a = alpha * 0.75
-		if s["age"] >= 4.0:
+			s["mat"].albedo_color.a = alpha * 0.8
+		if s["age"] >= strip_lifetime:
 			to_remove.append(s)
 
 	for r in to_remove:

@@ -222,7 +222,7 @@ func _run_countdown_sequence() -> void:
 
 	# Initialize projection at spawn (positive, ahead of line)
 	if vehicle:
-		var offset = vehicle.global_position - line_center
+		var offset = _get_car_position() - line_center
 		prev_forward_proj = offset.dot(line_forward)
 		prev_forward_proj_valid = true
 
@@ -231,13 +231,28 @@ func _run_countdown_sequence() -> void:
 	await get_tree().create_timer(0.9).timeout
 	countdown_tick.emit("")
 
+func _get_car_position() -> Vector3:
+	if not vehicle:
+		return Vector3.ZERO
+	if vehicle.has_method("get_car_position"):
+		return vehicle.get_car_position()
+	if vehicle.has_method("get_vehicle_position"):
+		return vehicle.get_vehicle_position()
+	var v_model = vehicle.get_node_or_null("Container")
+	if v_model:
+		return v_model.global_position
+	var sp = vehicle.get_node_or_null("Sphere")
+	if sp:
+		return sp.global_position
+	return vehicle.global_position
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("respawn"):
 		respawn_vehicle()
 
 func _physics_process(delta: float) -> void:
 	# Respawn if vehicle falls off world in any state
-	if vehicle and vehicle.global_position.y < -4.0:
+	if vehicle and _get_car_position().y < -4.0:
 		respawn_vehicle()
 
 	if current_state != GameState.RACING:
@@ -250,7 +265,7 @@ func _update_track_progress(_delta: float) -> void:
 	if not vehicle:
 		return
 
-	var car_pos: Vector3 = vehicle.global_position
+	var car_pos: Vector3 = _get_car_position()
 
 	# 1. Track cell coverage (anti-cheat & full circuit completion)
 	var gx: int
@@ -316,7 +331,7 @@ func respawn_vehicle() -> void:
 
 	prev_forward_proj_valid = false
 
-	var car_pos := vehicle.global_position
+	var car_pos := _get_car_position()
 	var best_cell_center := start_pos
 	var best_cell_dir := start_fwd
 	var best_dist := 1e9

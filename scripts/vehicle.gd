@@ -151,7 +151,14 @@ func rotate_showroom(delta: float) -> void:
 	vehicle_model.rotate_y(delta * 0.75)
 
 func get_vehicle_position() -> Vector3:
-	return vehicle_model.global_position
+	if vehicle_model:
+		return vehicle_model.global_position
+	if sphere:
+		return sphere.global_position
+	return global_position
+
+func get_car_position() -> Vector3:
+	return get_vehicle_position()
 
 func set_joystick_input(vec: Vector2, active: bool) -> void:
 	joystick_vector = vec

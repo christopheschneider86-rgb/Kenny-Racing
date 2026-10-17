@@ -1,11 +1,12 @@
 class_name TrackBuilder extends Node
 
-# Track Builder for Kenny Racing
-# Allows kids and parents to interactively design custom racetracks:
-# - Place road tiles (Start/Finish, Straight, Corner, Ramp)
-# - Place thematic props matching the selected World
-# - Rotate, erase, clear, or restore default circuit
-# - Immediate test drive with 1 click
+# Track Builder for Kenny Racing (Ported from mrdoob/Starter-Kit-Racing editor.html)
+# - Interactive Auto-Tiling: placing road connects seamlessly with corners and straights
+# - Finish Line Protection: (0, 0) cannot be erased; clicking it flips direction by 180°
+# - Erase tool with neighbor auto-updating
+# - Thematic Props placement matching the chosen World
+# - Integration with TrackManager slots (Slot 1..3 persistence)
+# - 1-Click Test Drive
 
 signal tool_changed(tool_type: String, item_id: int, prop_name: String)
 signal orientation_changed(angle_deg: int)
@@ -33,7 +34,29 @@ var current_prop_name: String = ""
 const ORIENTATIONS: Array[int] = [0, 16, 10, 22]
 const ORIENT_ANGLES: Array[float] = [0.0, PI / 2.0, PI, 3.0 * PI / 2.0]
 const ORIENT_DEGREES: Array[int] = [0, 90, 180, 270]
+const ORIENT_FLIP: Dictionary = { 0: 10, 10: 0, 16: 22, 22: 16 }
 var current_rot_idx: int = 0
+
+# Auto-tile mapping: Bitmask N=8, S=4, E=2, W=1 (exact table from mrdoob editor.html)
+# Items in mesh-library: 3 = corner, 4 = finish, 6 = straight
+const AUTOTILE_TABLE: Array[Dictionary] = [
+	{"item": 6, "orient": 0},   #  0: isolated
+	{"item": 6, "orient": 16},  #  1: W
+	{"item": 6, "orient": 16},  #  2: E
+	{"item": 6, "orient": 16},  #  3: E+W
+	{"item": 6, "orient": 0},   #  4: S
+	{"item": 3, "orient": 0},   #  5: S+W
+	{"item": 3, "orient": 16},  #  6: S+E
+	{"item": 6, "orient": 16},  #  7: S+E+W
+	{"item": 6, "orient": 0},   #  8: N
+	{"item": 3, "orient": 22},  #  9: N+W
+	{"item": 3, "orient": 10},  # 10: N+E
+	{"item": 6, "orient": 16},  # 11: N+E+W
+	{"item": 6, "orient": 0},   # 12: N+S
+	{"item": 6, "orient": 0},   # 13: N+S+W
+	{"item": 6, "orient": 0},   # 14: N+S+E
+	{"item": 6, "orient": 0},   # 15: N+S+E+W
+]
 
 # Cache of initial default track cells for 1-click restore
 var initial_cells: Dictionary = {}
@@ -99,23 +122,20 @@ func _create_3d_cursor() -> void:
 	# Subtle glowing frame on ground
 	cursor_box_mesh = MeshInstance3D.new()
 	var box = BoxMesh.new()
-	box.size = Vector3(7.4, 0.08, 7.4)
+	box.size = Vector3(7.4925, 0.12, 7.4925)
 	cursor_box_mesh.mesh = box
 
 	var mat = StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(0.2, 0.8, 1.0, 0.35)
+	mat.albedo_color = Color(0.2, 0.7, 1.0, 0.35)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	cursor_box_mesh.material_override = mat
 	cursor_root.add_child(cursor_box_mesh)
 
+	# Ghost model container
 	ghost_preview = Node3D.new()
 	ghost_preview.name = "GhostPreview"
 	cursor_root.add_child(ghost_preview)
-
-# ==============================================================================
-# PUBLIC CONTROL METHODS
-# ==============================================================================
 
 func open_builder() -> void:
 	is_active = true
@@ -124,29 +144,38 @@ func open_builder() -> void:
 		view_node.set_builder_mode(true)
 	if vehicle:
 		vehicle.input_disabled = true
-	builder_mode_toggled.emit(true)
 	_update_ghost_preview()
+	builder_mode_toggled.emit(true)
 
 func close_builder() -> void:
+	_save_to_active_slot()
 	is_active = false
 	cursor_root.visible = false
 	if view_node and view_node.has_method("set_builder_mode"):
 		view_node.set_builder_mode(false)
 	builder_mode_toggled.emit(false)
 
-func select_road_tool(item_id: int) -> void:
+func _save_to_active_slot() -> void:
+	if track_manager and track_manager.active_slot_idx > 0:
+		track_manager.save_current_grid_to_slot(track_manager.active_slot_idx)
+
+# ==============================================================================
+# TOOL ACTIONS
+# ==============================================================================
+
+func select_road_item(item_id: int) -> void:
 	current_tool_type = ToolType.ROAD
 	current_road_item = item_id
 	current_prop_path = ""
 	current_prop_name = ""
-	_update_cursor_color(Color(0.2, 0.8, 1.0, 0.35))
+	_update_cursor_color(Color(0.2, 0.7, 1.0, 0.35))
 	_update_ghost_preview()
-	var road_names = {3: "Kurve", 4: "Start / Ziel", 5: "Rampe", 6: "Gerade"}
-	tool_changed.emit("road", item_id, road_names.get(item_id, "Straße"))
+	var road_name := "Straße (Auto-Tile)" if item_id == 6 else ("Spezial-Straße #%d" % item_id)
+	tool_changed.emit("road", item_id, road_name)
 
-func select_prop_tool(glb_path: String, prop_title: String) -> void:
+func select_prop_item(prop_path: String, prop_title: String) -> void:
 	current_tool_type = ToolType.PROP
-	current_prop_path = glb_path
+	current_prop_path = prop_path
 	current_prop_name = prop_title
 	_update_cursor_color(Color(0.3, 1.0, 0.4, 0.35))
 	_update_ghost_preview()
@@ -168,48 +197,34 @@ func rotate_piece() -> void:
 		sound_effects.play_button_click()
 
 func restore_default_track() -> void:
-	if not grid_map:
-		return
-	clear_all()
-	for cell in initial_cells:
-		var d = initial_cells[cell]
-		grid_map.set_cell_item(cell, d["item"], d["orientation"])
 	if track_manager:
-		track_manager.set_world(track_manager.active_world_id)
+		track_manager.apply_slot(0)
 	if sound_effects and sound_effects.has_method("play_checkpoint_beep"):
 		sound_effects.play_checkpoint_beep()
 
 func clear_all() -> void:
-	if grid_map:
-		grid_map.clear()
+	if track_manager and track_manager.active_slot_idx > 0:
+		track_manager.clear_slot(track_manager.active_slot_idx)
+	elif grid_map:
+		const ROAD_ITEMS = [3, 4, 5, 6]
+		for c in grid_map.get_used_cells():
+			if grid_map.get_cell_item(c) in ROAD_ITEMS:
+				grid_map.set_cell_item(c, -1)
+		# Preserve finish line at (0, 0)
+		grid_map.set_cell_item(Vector3i(0, 0, 0), 4, 0)
+
 	for k in placed_props_map:
 		var node = placed_props_map[k]
 		if is_instance_valid(node):
 			node.queue_free()
 	placed_props_map.clear()
+
 	if sound_effects and sound_effects.has_method("play_button_click"):
 		sound_effects.play_button_click()
 
 func start_test_drive() -> void:
+	_save_to_active_slot()
 	close_builder()
-	# Find Start/Finish tile in grid
-	var start_pos = Vector3(3.75, 0.0, 3.75)
-	var forward = Vector3(0.0, 0.0, 1.0)
-
-	if grid_map:
-		var used = grid_map.get_used_cells()
-		for cell in used:
-			if grid_map.get_cell_item(cell) == 4: # track-finish
-				var loc = grid_map.map_to_local(cell)
-				start_pos = grid_map.to_global(loc)
-				start_pos.y = 0.0
-				var orient = grid_map.get_cell_item_orientation(cell)
-				forward = _get_forward_from_orientation(orient)
-				break
-
-	if vehicle:
-		vehicle.respawn_to(start_pos, forward)
-		vehicle.input_disabled = false
 
 	if race_manager:
 		race_manager.start_race_countdown()
@@ -222,7 +237,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not is_active:
 		return
 
-	# Shortcut 'R' for rotation
+	# Shortcut 'R' for manual rotation
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_R:
 			rotate_piece()
@@ -237,7 +252,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				var pan_dir = Vector3(-event.relative.x, 0.0, -event.relative.y) * 0.04
 				view_node.pan_builder(pan_dir)
 
-	# Mouse Button / Touch Click
+	# Mouse Button Click
 	elif event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
@@ -300,6 +315,102 @@ func _process_hover(screen_pos: Vector2) -> void:
 	var cell_center_global = grid_map.to_global(cell_center_local)
 	cursor_root.global_position = Vector3(cell_center_global.x, 0.06, cell_center_global.z)
 
+# ==============================================================================
+# MRDOOB AUTO-TILING PLACEMENT LOGIC
+# ==============================================================================
+
+# Exit bitmask: N=8, S=4, E=2, W=1
+func _get_cell_exits(item: int, orient: int) -> int:
+	if item == 3: # track-corner
+		match orient:
+			0: return 5   # S+W
+			16: return 6  # S+E
+			10: return 10 # N+E
+			22: return 9  # N+W
+			_: return 5
+	# Straight, finish, ramp — symmetric
+	if orient == 0 or orient == 10:
+		return 12 # N+S
+	return 3      # E+W
+
+func _get_connectivity_mask(cell: Vector2i) -> int:
+	var mask := 0
+	if not grid_map:
+		return mask
+
+	# N neighbor (cell.x, cell.y - 1) has S exit (& 4)
+	var n_item = grid_map.get_cell_item(Vector3i(cell.x, 0, cell.y - 1))
+	if n_item in [3, 4, 5, 6]:
+		var n_orient = grid_map.get_cell_item_orientation(Vector3i(cell.x, 0, cell.y - 1))
+		if _get_cell_exits(n_item, n_orient) & 4:
+			mask |= 8
+
+	# S neighbor (cell.x, cell.y + 1) has N exit (& 8)
+	var s_item = grid_map.get_cell_item(Vector3i(cell.x, 0, cell.y + 1))
+	if s_item in [3, 4, 5, 6]:
+		var s_orient = grid_map.get_cell_item_orientation(Vector3i(cell.x, 0, cell.y + 1))
+		if _get_cell_exits(s_item, s_orient) & 8:
+			mask |= 4
+
+	# E neighbor (cell.x + 1, cell.y) has W exit (& 1)
+	var e_item = grid_map.get_cell_item(Vector3i(cell.x + 1, 0, cell.y))
+	if e_item in [3, 4, 5, 6]:
+		var e_orient = grid_map.get_cell_item_orientation(Vector3i(cell.x + 1, 0, cell.y))
+		if _get_cell_exits(e_item, e_orient) & 1:
+			mask |= 2
+
+	# W neighbor (cell.x - 1, cell.y) has E exit (& 2)
+	var w_item = grid_map.get_cell_item(Vector3i(cell.x - 1, 0, cell.y))
+	if w_item in [3, 4, 5, 6]:
+		var w_orient = grid_map.get_cell_item_orientation(Vector3i(cell.x - 1, 0, cell.y))
+		if _get_cell_exits(w_item, w_orient) & 2:
+			mask |= 1
+
+	return mask
+
+func _get_presence_mask(cell: Vector2i) -> int:
+	var mask := 0
+	if not grid_map:
+		return mask
+	const ROAD_ITEMS = [3, 4, 5, 6]
+	if grid_map.get_cell_item(Vector3i(cell.x, 0, cell.y - 1)) in ROAD_ITEMS: mask |= 8
+	if grid_map.get_cell_item(Vector3i(cell.x, 0, cell.y + 1)) in ROAD_ITEMS: mask |= 4
+	if grid_map.get_cell_item(Vector3i(cell.x + 1, 0, cell.y)) in ROAD_ITEMS: mask |= 2
+	if grid_map.get_cell_item(Vector3i(cell.x - 1, 0, cell.y)) in ROAD_ITEMS: mask |= 1
+	return mask
+
+func _resolve_cell(cell: Vector2i) -> void:
+	if not grid_map:
+		return
+	var cell3 = Vector3i(cell.x, 0, cell.y)
+	var cur_item = grid_map.get_cell_item(cell3)
+	if cur_item not in [3, 4, 6]:
+		return
+
+	# Finish tile keeps its finish identity (item 4)
+	if cur_item == 4:
+		return
+
+	var mask = _get_connectivity_mask(cell)
+	if mask == 0:
+		var p_mask = _get_presence_mask(cell)
+		if p_mask & 12:
+			mask = 12
+		elif p_mask & 3:
+			mask = 3
+		else:
+			mask = 0
+
+	var info = AUTOTILE_TABLE[mask]
+	grid_map.set_cell_item(cell3, info["item"], info["orient"])
+
+func _resolve_cell_and_neighbors(cell: Vector2i) -> void:
+	_resolve_cell(cell)
+	_resolve_cell(Vector2i(cell.x, cell.y - 1))
+	_resolve_cell(Vector2i(cell.x, cell.y + 1))
+	_resolve_cell(Vector2i(cell.x + 1, cell.y))
+	_resolve_cell(Vector2i(cell.x - 1, cell.y))
+
 func _apply_placement(cell: Vector2i) -> void:
 	if not grid_map:
 		return
@@ -307,12 +418,28 @@ func _apply_placement(cell: Vector2i) -> void:
 		return
 
 	var cell3 = Vector3i(cell.x, 0, cell.y)
-	var orient = ORIENTATIONS[current_rot_idx]
+	var existing_item = grid_map.get_cell_item(cell3)
 
 	if current_tool_type == ToolType.ROAD:
-		# If there was a custom prop here, remove it
 		_remove_prop_at(cell)
-		grid_map.set_cell_item(cell3, current_road_item, orient)
+
+		# Finish Line Click -> 180° Flip direction (mrdoob editor feature)
+		if existing_item == 4:
+			var cur_orient = grid_map.get_cell_item_orientation(cell3)
+			var flipped = ORIENT_FLIP.get(cur_orient, cur_orient)
+			grid_map.set_cell_item(cell3, 4, flipped)
+			if sound_effects and sound_effects.has_method("play_button_click"):
+				sound_effects.play_button_click()
+			return
+
+		# Ramp or specific items placed with manual rotation
+		if current_road_item == 5:
+			grid_map.set_cell_item(cell3, 5, ORIENTATIONS[current_rot_idx])
+		else:
+			# Auto-tile road placement
+			grid_map.set_cell_item(cell3, 6, 0)
+			_resolve_cell_and_neighbors(cell)
+
 		if sound_effects and sound_effects.has_method("play_checkpoint_beep"):
 			sound_effects.play_checkpoint_beep()
 
@@ -333,8 +460,13 @@ func _apply_placement(cell: Vector2i) -> void:
 					sound_effects.play_checkpoint_beep()
 
 	elif current_tool_type == ToolType.ERASE:
+		# Protected Start/Finish Line cannot be erased
+		if existing_item == 4:
+			return
+
 		_remove_prop_at(cell)
 		grid_map.set_cell_item(cell3, GridMap.INVALID_CELL_ITEM)
+		_resolve_cell_and_neighbors(cell)
 		if sound_effects and sound_effects.has_method("play_button_click"):
 			sound_effects.play_button_click()
 
@@ -380,11 +512,3 @@ func _update_ghost_preview() -> void:
 				var inst = sc.instantiate()
 				inst.scale = Vector3(1.0, 1.0, 1.0)
 				ghost_preview.add_child(inst)
-
-func _get_forward_from_orientation(orient: int) -> Vector3:
-	match orient:
-		0: return Vector3(0.0, 0.0, 1.0)
-		16: return Vector3(-1.0, 0.0, 0.0)
-		10: return Vector3(0.0, 0.0, -1.0)
-		22: return Vector3(1.0, 0.0, 0.0)
-		_: return Vector3(0.0, 0.0, 1.0)
