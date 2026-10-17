@@ -1,10 +1,11 @@
 class_name RaceManager extends Node
 
 # Race Manager for Kenny Racing:
-# - Track waypoint and segment math
-# - Robust Lap Progression with halfway checkpoint anti-cheat
-# - Lap timing and Personal Best record tracking
-# - Respawn / Reset handler
+# - Track cell coverage and finish line crossing math ported from mrdoob/Starter-Kit-Racing (LapTimer.js)
+# - Robust Lap Progression with required cell coverage anti-cheat (>= 70%)
+# - Forward plane projection crossing detection with lateral road boundary checks
+# - Lap timing and Personal Best record tracking (saved to user://records.cfg)
+# - Respawn / Reset handler aligning vehicle with closest road tile
 # - Integration bridge for learning apps (postMessage / reward signal)
 
 signal race_state_changed(state: int)
@@ -27,13 +28,32 @@ var lap_start_time: float = 0.0
 var best_lap_time: float = 0.0
 var lap_times: Array[float] = []
 
-var start_pos: Vector3 = Vector3(3.75, 0.0, 3.75)
-var start_fwd: Vector3 = Vector3(0.0, 0.0, 1.0)
-var halfway_checkpoint_pos: Vector3 = Vector3(-11.25, 0.0, -11.25)
-var passed_halfway: bool = false
-var has_left_start_zone: bool = false
+# Finish line plane math (direct from mrdoob/Starter-Kit-Racing LapTimer.js)
+var line_center: Vector3 = Vector3(3.74625, 0.0, 3.74625)
+var line_forward: Vector3 = Vector3(0.0, 0.0, 1.0)
+var line_right: Vector3 = Vector3(1.0, 0.0, 0.0)
+var prev_forward_proj: float = 0.0
+var prev_forward_proj_valid: bool = false
 
+# Grid / Cell settings (CELL_RAW = 9.99, GRID_SCALE = 0.75 -> 7.4925m)
+const CELL_RAW: float = 9.99
+const GRID_SCALE: float = 0.75
+var cell_size: float = CELL_RAW * GRID_SCALE # 7.4925
+
+# Cell tracking for full circuit completion (anti-cheat + curves/corner-cutting support)
+var required_cells: Dictionary = {} # Vector2i -> bool
+var visited_cells: Dictionary = {}  # Vector2i -> bool
+
+# Vehicle spawn configuration
+var start_pos: Vector3 = Vector3(3.74625, 0.0, 4.95)
+var start_fwd: Vector3 = Vector3(0.0, 0.0, 1.0)
+
+# Track waypoints for fallback and segment tracking
+var track_waypoints: Array[Vector3] = []
 var current_segment: int = 0
+
+# Godot GridMap orientation to degrees (matches mrdoob ORIENT_DEG)
+const ORIENT_DEG: Dictionary = { 0: 0, 10: 180, 16: 90, 22: 270 }
 
 # 16 connected track cells that form the default circuit
 const TRACK_CELLS: Array[Vector2i] = [
@@ -55,65 +75,91 @@ const TRACK_CELLS: Array[Vector2i] = [
 	Vector2i( 0, -1), # 15: Straight -> into Finish Line
 ]
 
-var track_waypoints: Array[Vector3] = []
+const RECORDS_PATH = "user://records.cfg"
 
 func _ready() -> void:
-	_build_waypoints()
+	best_lap_time = _load_best_lap()
+	_rebuild_track_data()
 	if vehicle:
 		vehicle.input_disabled = true
 		_place_vehicle_at_start()
 
-func _find_start_tile() -> void:
-	start_pos = Vector3(3.75, 0.0, 3.75)
-	start_fwd = Vector3(0.0, 0.0, 1.0)
+func _load_best_lap() -> float:
+	var cfg = ConfigFile.new()
+	if cfg.load(RECORDS_PATH) == OK:
+		return cfg.get_value("records", "best_lap", 0.0)
+	return 0.0
+
+func _save_best_lap(time_val: float) -> void:
+	var cfg = ConfigFile.new()
+	cfg.load(RECORDS_PATH)
+	cfg.set_value("records", "best_lap", time_val)
+	cfg.save(RECORDS_PATH)
+
+func _rebuild_track_data() -> void:
+	required_cells.clear()
+	visited_cells.clear()
+	track_waypoints.clear()
+
+	var finish_found := false
+	var finish_world_center := Vector3(3.74625, 0.0, 3.74625)
+	var finish_orient := 0
+
+	# Mesh Library IDs: 3 = corner, 4 = finish, 5 = ramp, 6 = straight
+	const TRACK_ITEMS = [3, 4, 5, 6]
 
 	if grid_map:
 		for cell in grid_map.get_used_cells():
-			if grid_map.get_cell_item(cell) == 4: # track-finish
+			var item = grid_map.get_cell_item(cell)
+			if item in TRACK_ITEMS:
+				var cell_2d = Vector2i(cell.x, cell.z)
+				if item == 4: # track-finish
+					finish_found = true
+					finish_orient = grid_map.get_cell_item_orientation(cell)
+					var loc = grid_map.map_to_local(cell)
+					finish_world_center = grid_map.to_global(loc)
+					finish_world_center.y = 0.0
+				else:
+					required_cells[cell_2d] = true
+
 				var loc = grid_map.map_to_local(cell)
-				start_pos = grid_map.to_global(loc)
-				start_pos.y = 0.0
-				var orient = grid_map.get_cell_item_orientation(cell)
-				start_fwd = _get_forward_from_orientation(orient)
-				break
+				var wp = grid_map.to_global(loc)
+				wp.y = 0.0
+				track_waypoints.append(wp)
 
-func _build_waypoints() -> void:
-	track_waypoints.clear()
-	_find_start_tile()
-
-	var step := 7.4925
-	for cell in TRACK_CELLS:
-		if grid_map:
-			var local_center = grid_map.map_to_local(Vector3i(cell.x, 0, cell.y))
-			track_waypoints.append(grid_map.to_global(local_center))
-		else:
-			var wx = (float(cell.x) + 0.5) * step
-			var wz = (float(cell.y) + 0.5) * step
+	if not finish_found:
+		# Fallback to default circuit
+		for c in TRACK_CELLS:
+			if c != Vector2i(0, 0):
+				required_cells[c] = true
+			var wx = (float(c.x) + 0.5) * cell_size
+			var wz = (float(c.y) + 0.5) * cell_size
 			track_waypoints.append(Vector3(wx, 0.0, wz))
+		finish_world_center = Vector3(3.74625, 0.0, 3.74625)
+		finish_orient = 0
 
-	# Find the halfway point farthest from start_pos
-	var max_dist := 0.0
-	var best_halfway = start_pos
-	for wp in track_waypoints:
-		var d = (wp - start_pos).length()
-		if d > max_dist:
-			max_dist = d
-			best_halfway = wp
-	halfway_checkpoint_pos = best_halfway
+	# Compute finish line vectors according to mrdoob's LapTimer.js
+	var deg: float = float(ORIENT_DEG.get(finish_orient, 0))
+	var rad: float = deg_to_rad(deg)
+
+	line_center = finish_world_center
+	line_forward = Vector3(sin(rad), 0.0, cos(rad)).normalized()
+	line_right = Vector3(line_forward.z, 0.0, -line_forward.x).normalized()
+
+	# Spawn slightly ahead of line center facing forward down the track
+	start_pos = line_center + line_forward * 1.25
+	start_fwd = line_forward
 
 func _place_vehicle_at_start() -> void:
 	if not vehicle:
 		return
-	_find_start_tile()
 	vehicle.respawn_to(start_pos, start_fwd)
+	prev_forward_proj_valid = false
 
 func _get_forward_from_orientation(orient: int) -> Vector3:
-	match orient:
-		0: return Vector3(0.0, 0.0, 1.0)
-		16: return Vector3(-1.0, 0.0, 0.0)
-		10: return Vector3(0.0, 0.0, -1.0)
-		22: return Vector3(1.0, 0.0, 0.0)
-		_: return Vector3(0.0, 0.0, 1.0)
+	var deg: float = float(ORIENT_DEG.get(orient, 0))
+	var rad: float = deg_to_rad(deg)
+	return Vector3(sin(rad), 0.0, cos(rad)).normalized()
 
 func show_main_menu() -> void:
 	current_state = GameState.MENU
@@ -126,7 +172,7 @@ func start_race_countdown() -> void:
 	current_state = GameState.COUNTDOWN
 	race_state_changed.emit(current_state)
 
-	_build_waypoints()
+	_rebuild_track_data()
 	_place_vehicle_at_start()
 	if vehicle:
 		vehicle.input_disabled = true
@@ -134,11 +180,11 @@ func start_race_countdown() -> void:
 	current_lap = 1
 	race_time = 0.0
 	lap_start_time = 0.0
-	best_lap_time = 0.0
 	lap_times.clear()
-	passed_halfway = false
-	has_left_start_zone = false
+	visited_cells.clear()
 	current_segment = 0
+	prev_forward_proj_valid = false
+
 	lap_updated.emit(current_lap, total_laps, best_lap_time)
 
 	_run_countdown_sequence()
@@ -169,9 +215,18 @@ func _run_countdown_sequence() -> void:
 
 	current_state = GameState.RACING
 	race_state_changed.emit(current_state)
-	lap_start_time = race_time
+	lap_start_time = 0.0
+	race_time = 0.0
 	if vehicle:
 		vehicle.input_disabled = false
+
+	# Initialize projection at spawn (positive, ahead of line)
+	if vehicle:
+		var offset = vehicle.global_position - line_center
+		prev_forward_proj = offset.dot(line_forward)
+		prev_forward_proj_valid = true
+
+	visited_cells.clear()
 
 	await get_tree().create_timer(0.9).timeout
 	countdown_tick.emit("")
@@ -192,84 +247,104 @@ func _physics_process(delta: float) -> void:
 	_update_track_progress(delta)
 
 func _update_track_progress(_delta: float) -> void:
-	if not vehicle or track_waypoints.is_empty():
+	if not vehicle:
 		return
 
-	var car_pos = vehicle.global_position
-	var n = track_waypoints.size()
+	var car_pos: Vector3 = vehicle.global_position
 
-	# Find closest track segment
-	var best_dist := 1e9
-	var best_seg := 0
+	# 1. Track cell coverage (anti-cheat & full circuit completion)
+	var gx: int
+	var gz: int
+	if grid_map:
+		var local_pos = grid_map.to_local(car_pos)
+		var map_cell = grid_map.local_to_map(local_pos)
+		gx = map_cell.x
+		gz = map_cell.z
+	else:
+		gx = int(floorf(car_pos.x / cell_size))
+		gz = int(floorf(car_pos.z / cell_size))
 
-	for i in range(n):
-		var p0 = track_waypoints[i]
-		var p1 = track_waypoints[(i + 1) % n]
-		var seg_v = p1 - p0
-		var seg_len_sq = seg_v.x * seg_v.x + seg_v.z * seg_v.z
-		if seg_len_sq < 0.001:
-			continue
+	var cell_key := Vector2i(gx, gz)
+	if required_cells.has(cell_key):
+		visited_cells[cell_key] = true
 
-		var to_car = car_pos - p0
-		var t = clampf((to_car.x * seg_v.x + to_car.z * seg_v.z) / seg_len_sq, 0.0, 1.0)
-		var proj = p0 + seg_v * t
-		var d = Vector2(car_pos.x - proj.x, car_pos.z - proj.z).length()
+	# 2. Finish Line Plane Crossing Math (ported from mrdoob/Starter-Kit-Racing LapTimer.js)
+	var offset := car_pos - line_center
+	var forward_proj := offset.dot(line_forward)
+	var lateral_proj := absf(offset.dot(line_right))
 
-		if d < best_dist:
-			best_dist = d
-			best_seg = i
+	if prev_forward_proj_valid:
+		# Within track width (cell_size * 0.75 is ~5.6m, giving generous track boundary leeway)
+		var on_line := lateral_proj <= (cell_size * 0.75)
+		# No teleport or respawn jumps
+		var no_teleport := absf(forward_proj - prev_forward_proj) < 6.0
+		# Crossed line in forward direction (from behind line to ahead of line)
+		var crossed_forward := (prev_forward_proj < 0.0 and forward_proj >= 0.0)
 
-	current_segment = best_seg
+		if on_line and no_teleport and crossed_forward:
+			var req_count := max(1, required_cells.size())
+			var coverage := float(visited_cells.size()) / float(req_count)
+			var lap_duration := race_time - lap_start_time
 
-	var dist_from_start = Vector2(car_pos.x - start_pos.x, car_pos.z - start_pos.z).length()
+			# At least 70% of circuit cells visited (anti-cheat + allows corner-cutting / drifting)
+			if coverage >= 0.70 and lap_duration > 2.0:
+				_complete_lap(lap_duration)
+			visited_cells.clear()
 
-	# Car leaves the initial spawn start zone
-	if dist_from_start > 8.0:
-		has_left_start_zone = true
+	prev_forward_proj = forward_proj
+	prev_forward_proj_valid = true
 
-	# 1. HALFWAY CHECKPOINT
-	# Car must reach the halfway region of the circuit
-	var dist_to_halfway = Vector2(car_pos.x - halfway_checkpoint_pos.x, car_pos.z - halfway_checkpoint_pos.z).length()
-	var seg_halfway = (current_segment >= n / 3 and current_segment <= (2 * n) / 3)
-	if dist_to_halfway < 14.0 or seg_halfway:
-		passed_halfway = true
+func _complete_lap(lap_duration: float) -> void:
+	lap_times.append(lap_duration)
+	if best_lap_time <= 0.0 or lap_duration < best_lap_time:
+		best_lap_time = lap_duration
+		_save_best_lap(best_lap_time)
 
-	# 2. LAP COMPLETION AT FINISH LINE
-	# Legitimate lap completion criteria:
-	# - Has left start zone and driven past halfway point
-	# - Reaches finish line trigger area (radius 7.5m around start line)
-	# - Has driven at least 3.0 seconds since lap start
-	if passed_halfway and has_left_start_zone and dist_from_start < 7.5:
-		var lap_duration = race_time - lap_start_time
-		if lap_duration > 3.0:
-			lap_times.append(lap_duration)
-			if best_lap_time <= 0.0 or lap_duration < best_lap_time:
-				best_lap_time = lap_duration
+	lap_start_time = race_time
+	current_lap += 1
 
-			lap_start_time = race_time
-			passed_halfway = false
-			has_left_start_zone = false
-			current_lap += 1
-
-			if current_lap > total_laps:
-				_finish_race()
-				return
-			else:
-				lap_updated.emit(current_lap, total_laps, best_lap_time)
-				if sound_effects:
-					sound_effects.play_lap_chime()
+	if current_lap > total_laps:
+		_finish_race()
+	else:
+		lap_updated.emit(current_lap, total_laps, best_lap_time)
+		if sound_effects:
+			sound_effects.play_lap_chime()
 
 func respawn_vehicle() -> void:
-	if not vehicle or track_waypoints.is_empty():
+	if not vehicle:
 		return
 
-	var n = track_waypoints.size()
-	var p0 = track_waypoints[current_segment]
-	var p1 = track_waypoints[(current_segment + 1) % n]
-	var seg_dir = (p1 - p0).normalized()
-	var center_pos = (p0 + p1) * 0.5 + Vector3(0.0, 0.35, 0.0)
+	prev_forward_proj_valid = false
 
-	vehicle.respawn_to(center_pos, seg_dir)
+	var car_pos := vehicle.global_position
+	var best_cell_center := start_pos
+	var best_cell_dir := start_fwd
+	var best_dist := 1e9
+
+	# Find closest track tile
+	if grid_map:
+		const TRACK_ITEMS = [3, 4, 5, 6]
+		for cell in grid_map.get_used_cells():
+			var item = grid_map.get_cell_item(cell)
+			if item in TRACK_ITEMS:
+				var loc = grid_map.map_to_local(cell)
+				var world_pos = grid_map.to_global(loc)
+				world_pos.y = 0.0
+				var d = Vector2(car_pos.x - world_pos.x, car_pos.z - world_pos.z).length()
+				if d < best_dist:
+					best_dist = d
+					best_cell_center = world_pos
+					var orient = grid_map.get_cell_item_orientation(cell)
+					best_cell_dir = _get_forward_from_orientation(orient)
+	elif not track_waypoints.is_empty():
+		for wp in track_waypoints:
+			var d = Vector2(car_pos.x - wp.x, car_pos.z - wp.z).length()
+			if d < best_dist:
+				best_dist = d
+				best_cell_center = wp
+				best_cell_dir = start_fwd
+
+	vehicle.respawn_to(best_cell_center + Vector3(0.0, 0.35, 0.0), best_cell_dir)
 
 func _finish_race() -> void:
 	current_state = GameState.FINISHED
