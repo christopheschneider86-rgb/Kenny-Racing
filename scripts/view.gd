@@ -7,11 +7,18 @@ extends Node3D
 
 enum ViewMode { FOLLOW_VEHICLE, BUILDER }
 var view_mode: ViewMode = ViewMode.FOLLOW_VEHICLE
+var builder_pos: Vector3 = Vector3(-7.5, 0.0, -7.5)
+var builder_zoom: float = 28.0
+
 var default_basis: Basis
+# Top-down draufsicht basis: Looking straight down (-Y)
+# X right (1, 0, 0), Y up in screen (0, 0, -1), Z towards eye (0, 1, 0)
 var builder_basis: Basis = Basis(Vector3(1, 0, 0), Vector3(0, 0, -1), Vector3(0, 1, 0))
 
 func _ready() -> void:
 	default_basis = self.transform.basis
+	if camera:
+		camera.far = 150.0
 
 func set_builder_mode(active: bool) -> void:
 	if active:
@@ -30,14 +37,19 @@ func zoom_builder(delta_zoom: float) -> void:
 
 # Functions
 
-func _physics_process(delta):
+func _physics_process(delta: float) -> void:
 	if view_mode == ViewMode.BUILDER:
 		self.position = self.position.lerp(builder_pos, delta * 6.0)
-		self.transform.basis = self.transform.basis.slerp(builder_basis, delta * 6.0).orthonormalized()
+		var q_cur = self.transform.basis.get_rotation_quaternion()
+		var q_tgt = builder_basis.get_rotation_quaternion()
+		self.transform.basis = Basis(q_cur.slerp(q_tgt, clampf(delta * 6.0, 0.0, 1.0)).normalized())
 		camera.position.z = lerp(camera.position.z, builder_zoom, delta * 5.0)
 		return
 
-	self.transform.basis = self.transform.basis.slerp(default_basis, delta * 4.0).orthonormalized()
+	if default_basis.determinant() != 0.0:
+		var q_cur = self.transform.basis.get_rotation_quaternion()
+		var q_tgt = default_basis.get_rotation_quaternion()
+		self.transform.basis = Basis(q_cur.slerp(q_tgt, clampf(delta * 4.0, 0.0, 1.0)).normalized())
 
 	if target == null:
 		return

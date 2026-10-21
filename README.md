@@ -1,6 +1,6 @@
 <p align="center"><img src="icon.png"/></p>
 
-# Starter Kit Racing (Belohnungsspiel-Edition)
+# Kenny Racing (Belohnungsspiel-Edition)
 
 Dieses Rennspiel ist optimiert als motivierendes **Belohnungsspiel für Kinder-Lern-Apps** in Godot 4 (mit 4 Runden, Siegbildschirm, Touch-Steuerung, Falschfahrer-Warnung, Fahrzeugauswahl und Streckenbuilder mit Welten).
 
