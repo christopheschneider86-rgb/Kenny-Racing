@@ -21,27 +21,166 @@ enum WorldTheme { FOREST = 0, STADIUM = 1, RALLY = 2 }
 
 var scenery_root: Node3D
 var active_world_id: String = "forest"
+var spectator_trucks: Array[Node3D] = []
 
 const SLOTS_SAVE_PATH = "user://custom_tracks.json"
 
 # The immutable 16-cell Original circuit
 const DEFAULT_ORIGINAL_CELLS: Array = [
+	{"x": -3, "z": 0, "item": 0, "orient": 0},
+	{"x": -3, "z": 1, "item": 1, "orient": 22},
+	{"x": -3, "z": 2, "item": 1, "orient": 16},
+	{"x": 1, "z": -1, "item": 1, "orient": 10},
+	{"x": 1, "z": 0, "item": 1, "orient": 10},
+	{"x": 1, "z": 1, "item": 1, "orient": 10},
+	{"x": 1, "z": 2, "item": 0, "orient": 0},
+	{"x": 1, "z": 3, "item": 1, "orient": 10},
+	{"x": 0, "z": 3, "item": 0, "orient": 0},
+	{"x": -1, "z": 3, "item": 1, "orient": 10},
+	{"x": -2, "z": 3, "item": 1, "orient": 10},
+	{"x": -3, "z": 3, "item": 1, "orient": 10},
+	{"x": -4, "z": -2, "item": 2, "orient": 10},
+	{"x": -4, "z": -1, "item": 0, "orient": 0},
+	{"x": -4, "z": -4, "item": 1, "orient": 10},
+	{"x": -4, "z": -3, "item": 1, "orient": 16},
+	{"x": -3, "z": -4, "item": 1, "orient": 10},
+	{"x": -2, "z": -4, "item": 1, "orient": 10},
+	{"x": -1, "z": -4, "item": 2, "orient": 22},
+	{"x": 0, "z": -4, "item": 1, "orient": 10},
+	{"x": 1, "z": -4, "item": 1, "orient": 10},
+	{"x": 1, "z": -3, "item": 1, "orient": 10},
+	{"x": 1, "z": -2, "item": 1, "orient": 10},
+	{"x": -4, "z": 0, "item": 1, "orient": 16},
+	{"x": -4, "z": 1, "item": 1, "orient": 16},
+	{"x": -4, "z": 2, "item": 0, "orient": 16},
+	{"x": -4, "z": 3, "item": 0, "orient": 0},
+	{"x": -4, "z": 4, "item": 1, "orient": 10},
+	{"x": -3, "z": 4, "item": 0, "orient": 0},
+	{"x": -2, "z": 4, "item": 1, "orient": 10},
+	{"x": -1, "z": 4, "item": 1, "orient": 10},
+	{"x": 0, "z": 4, "item": 1, "orient": 10},
+	{"x": 1, "z": 4, "item": 1, "orient": 10},
+	{"x": 2, "z": 4, "item": 1, "orient": 10},
+	{"x": 2, "z": 3, "item": 1, "orient": 10},
+	{"x": 2, "z": 2, "item": 1, "orient": 10},
+	{"x": 2, "z": 1, "item": 1, "orient": 10},
+	{"x": 2, "z": 0, "item": 1, "orient": 10},
+	{"x": 2, "z": -1, "item": 1, "orient": 10},
+	{"x": 2, "z": -2, "item": 0, "orient": 0},
+	{"x": 2, "z": -3, "item": 1, "orient": 10},
+	{"x": 2, "z": -4, "item": 1, "orient": 10},
+	{"x": 2, "z": -5, "item": 1, "orient": 10},
+	{"x": 1, "z": -5, "item": 1, "orient": 10},
+	{"x": 0, "z": -5, "item": 1, "orient": 10},
+	{"x": 0, "z": -6, "item": 0, "orient": 0},
+	{"x": -1, "z": -6, "item": 1, "orient": 10},
+	{"x": -1, "z": -5, "item": 1, "orient": 10},
+	{"x": -2, "z": -5, "item": 1, "orient": 10},
+	{"x": -3, "z": -5, "item": 0, "orient": 0},
+	{"x": -4, "z": -5, "item": 1, "orient": 10},
+	{"x": -4, "z": -6, "item": 0, "orient": 0},
+	{"x": -3, "z": -6, "item": 0, "orient": 0},
+	{"x": -2, "z": -6, "item": 0, "orient": 0},
+	{"x": 1, "z": -6, "item": 1, "orient": 10},
+	{"x": 2, "z": -6, "item": 1, "orient": 10},
+	{"x": -5, "z": 4, "item": 1, "orient": 10},
+	{"x": -5, "z": 3, "item": 0, "orient": 0},
+	{"x": -5, "z": 2, "item": 0, "orient": 16},
+	{"x": -5, "z": 1, "item": 0, "orient": 16},
+	{"x": -5, "z": 0, "item": 1, "orient": 16},
+	{"x": -5, "z": -1, "item": 0, "orient": 16},
+	{"x": -5, "z": -2, "item": 1, "orient": 10},
+	{"x": -5, "z": -3, "item": 0, "orient": 16},
+	{"x": -5, "z": -4, "item": 0, "orient": 0},
+	{"x": -5, "z": -5, "item": 1, "orient": 10},
+	{"x": -5, "z": -6, "item": 1, "orient": 10},
+	{"x": -6, "z": -6, "item": 0, "orient": 0},
+	{"x": -6, "z": -5, "item": 1, "orient": 10},
+	{"x": -6, "z": -4, "item": 0, "orient": 0},
+	{"x": -6, "z": -3, "item": 0, "orient": 16},
+	{"x": -6, "z": -2, "item": 0, "orient": 16},
+	{"x": -6, "z": -1, "item": 0, "orient": 16},
+	{"x": -6, "z": 0, "item": 1, "orient": 10},
+	{"x": -6, "z": 1, "item": 1, "orient": 10},
+	{"x": -6, "z": 2, "item": 1, "orient": 10},
+	{"x": -6, "z": 3, "item": 1, "orient": 10},
+	{"x": -6, "z": 4, "item": 1, "orient": 10},
+	{"x": -6, "z": -7, "item": 1, "orient": 10},
+	{"x": -5, "z": -7, "item": 1, "orient": 10},
+	{"x": -4, "z": -7, "item": 0, "orient": 0},
+	{"x": -3, "z": -7, "item": 0, "orient": 0},
+	{"x": -2, "z": -7, "item": 1, "orient": 10},
+	{"x": -1, "z": -7, "item": 1, "orient": 10},
+	{"x": 0, "z": -7, "item": 1, "orient": 10},
+	{"x": 1, "z": -7, "item": 1, "orient": 10},
+	{"x": 2, "z": -7, "item": 1, "orient": 10},
+	{"x": 2, "z": -8, "item": 1, "orient": 10},
+	{"x": 1, "z": -8, "item": 1, "orient": 10},
+	{"x": 0, "z": -8, "item": 1, "orient": 10},
+	{"x": -1, "z": -8, "item": 1, "orient": 10},
+	{"x": -2, "z": -8, "item": 1, "orient": 10},
+	{"x": -3, "z": -8, "item": 1, "orient": 10},
+	{"x": -4, "z": -8, "item": 1, "orient": 10},
+	{"x": -5, "z": -8, "item": 1, "orient": 10},
+	{"x": -6, "z": -8, "item": 1, "orient": 10},
+	{"x": -7, "z": -8, "item": 1, "orient": 10},
+	{"x": -7, "z": -7, "item": 1, "orient": 10},
+	{"x": -7, "z": -6, "item": 1, "orient": 10},
+	{"x": -7, "z": -5, "item": 1, "orient": 10},
+	{"x": -7, "z": -4, "item": 1, "orient": 10},
+	{"x": -7, "z": -3, "item": 1, "orient": 10},
+	{"x": -7, "z": -2, "item": 1, "orient": 10},
+	{"x": -7, "z": -1, "item": 1, "orient": 10},
+	{"x": -7, "z": 0, "item": 1, "orient": 10},
+	{"x": -7, "z": 1, "item": 1, "orient": 10},
+	{"x": -7, "z": 2, "item": 1, "orient": 10},
+	{"x": -7, "z": 3, "item": 1, "orient": 10},
+	{"x": -7, "z": 4, "item": 1, "orient": 10},
+	{"x": -8, "z": 4, "item": 1, "orient": 10},
+	{"x": -8, "z": 3, "item": 1, "orient": 10},
+	{"x": -8, "z": 2, "item": 1, "orient": 10},
+	{"x": -8, "z": 1, "item": 1, "orient": 10},
+	{"x": -8, "z": 0, "item": 1, "orient": 10},
+	{"x": -8, "z": -1, "item": 1, "orient": 10},
+	{"x": -8, "z": -2, "item": 1, "orient": 10},
+	{"x": -8, "z": -3, "item": 1, "orient": 10},
+	{"x": -8, "z": -4, "item": 1, "orient": 10},
+	{"x": -8, "z": -5, "item": 1, "orient": 10},
+	{"x": -8, "z": -6, "item": 1, "orient": 10},
+	{"x": -8, "z": -7, "item": 1, "orient": 10},
+	{"x": -8, "z": -8, "item": 1, "orient": 10},
+	{"x": -8, "z": -9, "item": 1, "orient": 10},
+	{"x": -7, "z": -9, "item": 1, "orient": 10},
+	{"x": -6, "z": -9, "item": 1, "orient": 10},
+	{"x": -5, "z": -9, "item": 1, "orient": 10},
+	{"x": -4, "z": -9, "item": 1, "orient": 10},
+	{"x": -3, "z": -9, "item": 1, "orient": 10},
+	{"x": -2, "z": -9, "item": 1, "orient": 10},
+	{"x": -1, "z": -9, "item": 1, "orient": 10},
+	{"x": 0, "z": -9, "item": 1, "orient": 10},
+	{"x": 1, "z": -9, "item": 1, "orient": 10},
+	{"x": 2, "z": -9, "item": 1, "orient": 10},
+	{"x": -1, "z": -1, "item": 1, "orient": 22},
+	{"x": -1, "z": -2, "item": 1, "orient": 22},
+	{"x": -2, "z": -2, "item": 1, "orient": 22},
+	{"x": -1, "z": 1, "item": 2, "orient": 22},
+	{"x": -1, "z": 0, "item": 1, "orient": 22},
 	{"x": 0, "z": 0, "item": 4, "orient": 0},
-	{"x": 0, "z": 1, "item": 6, "orient": 0},
-	{"x": 0, "z": 2, "item": 3, "orient": 22},
-	{"x": -1, "z": 2, "item": 6, "orient": 16},
-	{"x": -2, "z": 2, "item": 3, "orient": 10},
-	{"x": -2, "z": 1, "item": 6, "orient": 10},
+	{"x": 0, "z": -1, "item": 6, "orient": 0},
 	{"x": -2, "z": 0, "item": 6, "orient": 10},
-	{"x": -2, "z": -1, "item": 3, "orient": 0},
-	{"x": -3, "z": -1, "item": 3, "orient": 10},
+	{"x": -2, "z": 1, "item": 6, "orient": 10},
 	{"x": -3, "z": -2, "item": 6, "orient": 0},
-	{"x": -3, "z": -3, "item": 3, "orient": 16},
 	{"x": -2, "z": -3, "item": 6, "orient": 22},
 	{"x": -1, "z": -3, "item": 6, "orient": 22},
-	{"x": 0, "z": -3, "item": 3, "orient": 0},
 	{"x": 0, "z": -2, "item": 6, "orient": 0},
-	{"x": 0, "z": -1, "item": 6, "orient": 0},
+	{"x": -1, "z": 2, "item": 6, "orient": 16},
+	{"x": -3, "z": -3, "item": 3, "orient": 16},
+	{"x": -3, "z": -1, "item": 3, "orient": 10},
+	{"x": -2, "z": -1, "item": 3, "orient": 0},
+	{"x": 0, "z": -3, "item": 3, "orient": 0},
+	{"x": 0, "z": 2, "item": 3, "orient": 22},
+	{"x": -2, "z": 2, "item": 3, "orient": 10},
+	{"x": 0, "z": 1, "item": 6, "orient": 0},
 ]
 
 var track_slots: Array = []
@@ -168,6 +307,12 @@ func _ready() -> void:
 		sun_light = get_node_or_null("../Sun")
 	if not environment:
 		environment = get_node_or_null("../Environment")
+
+	spectator_trucks.clear()
+	for truck_name in ["../vehicle-truck-green", "../vehicle-truck-purple", "../vehicle-truck-red"]:
+		var t = get_node_or_null(truck_name)
+		if t is Node3D:
+			spectator_trucks.append(t)
 
 	init_slots()
 	apply_slot(0)
@@ -306,6 +451,11 @@ func apply_slot(slot_idx: int) -> void:
 
 	# Apply world theme
 	set_world(slot["theme"])
+
+	# Spectator trucks visibility (only on authentic Original circuit)
+	for t in spectator_trucks:
+		if is_instance_valid(t):
+			t.visible = (active_slot_idx == 0)
 
 	# Populate GridMap
 	if grid_map:
@@ -457,16 +607,21 @@ func set_world(world_id: String) -> void:
 
 	# Lighting adjustments
 	if sun_light:
-		sun_light.light_color = info["sun_color"]
-		sun_light.light_energy = info["sun_energy"]
+		if active_slot_idx == 0:
+			sun_light.light_color = Color(1.0, 0.98, 0.94)
+			sun_light.light_energy = 0.85
+		else:
+			sun_light.light_color = info["sun_color"]
+			sun_light.light_energy = info["sun_energy"]
 
-	# Build scenery for chosen world
-	if world_id == "stadium":
-		_build_stadium_scenery()
-	elif world_id == "rally":
-		_build_rally_scenery()
-	else:
-		_build_forest_scenery()
+	# Build scenery for chosen world (only for custom slots; original has its full authentic 154-tile layout)
+	if active_slot_idx > 0:
+		if world_id == "stadium":
+			_build_stadium_scenery()
+		elif world_id == "rally":
+			_build_rally_scenery()
+		else:
+			_build_forest_scenery()
 
 	world_changed.emit(active_world_id)
 
