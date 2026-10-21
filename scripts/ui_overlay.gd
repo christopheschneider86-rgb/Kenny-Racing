@@ -323,10 +323,12 @@ func _create_start_screen() -> void:
 	start_screen = Control.new()
 	start_screen.name = "StartScreen"
 	start_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	start_screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root_control.add_child(start_screen)
 
 	var bg_dim = ColorRect.new()
 	bg_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bg_dim.color = Color(0.02, 0.04, 0.08, 0.15)
 	start_screen.add_child(bg_dim)
 
@@ -1101,6 +1103,14 @@ func _connect_race_signals() -> void:
 	race_manager.lap_updated.connect(_on_lap_updated)
 	race_manager.race_finished.connect(_on_race_finished)
 
+func _unhandled_input(event: InputEvent) -> void:
+	if start_screen and start_screen.visible:
+		if event.is_action_pressed("forward") or (event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_SPACE or event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER)):
+			_on_start_button_pressed()
+	elif victory_screen and victory_screen.visible:
+		if event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_SPACE or event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER):
+			_on_start_button_pressed()
+
 func _process(delta: float) -> void:
 	if start_screen and start_screen.visible:
 		if vehicle and vehicle.has_method("rotate_showroom"):
@@ -1234,25 +1244,19 @@ static func _load_icon_texture(path: String) -> Texture2D:
 
 	var tex: Texture2D = null
 
-	# 1. Standard Godot resource load (handles imported textures and .ctex)
-	if ResourceLoader.has_cached(path):
-		tex = ResourceLoader.get_cached_ref(path) as Texture2D
-	if not tex:
+	# 1. Standard Godot resource loader (handles imported textures, .ctex, and internal cache)
+	if ResourceLoader.exists(path):
 		var res = load(path)
 		if res is Texture2D:
 			tex = res
 
-	# 2. Image loader fallback (handles raw PNG files in PCK or disk directly)
+	# 2. Image loader fallback (handles raw PNG files in PCK or virtual filesystem)
 	if not tex and FileAccess.file_exists(path):
-		var img = Image.new()
-		if img.load(path) == OK and not img.is_empty():
-			tex = ImageTexture.create_from_image(img)
-		else:
-			var bytes = FileAccess.get_file_as_bytes(path)
-			if bytes.size() > 0:
-				var img2 = Image.new()
-				if img2.load_png_from_buffer(bytes) == OK and not img2.is_empty():
-					tex = ImageTexture.create_from_image(img2)
+		var bytes = FileAccess.get_file_as_bytes(path)
+		if bytes.size() > 0:
+			var img = Image.new()
+			if img.load_png_from_buffer(bytes) == OK and not img.is_empty():
+				tex = ImageTexture.create_from_image(img)
 
 	if tex:
 		_icon_cache[path] = tex
